@@ -83,7 +83,7 @@ export default function DiscoverPage() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
-      <div style={{ padding: "24px 48px", borderBottom: "1px solid var(--border)", background: "var(--warm-white)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 16, flexShrink: 0 }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", background: "var(--warm-white)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexShrink: 0 }} className="discover-topbar">
         <div>
           <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26 }}>Discover</div>
           <div style={{ fontSize: 13, color: "var(--ink-faint)", fontWeight: 300 }}>Available coffees from your roasters</div>
@@ -105,7 +105,7 @@ export default function DiscoverPage() {
         </div>
       </div>
 
-      <div style={{ padding: "12px 48px", borderBottom: "1px solid var(--border)", background: "var(--cream)", display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
+      <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", background: "var(--cream)", display: "flex", gap: 6, alignItems: "center", flexWrap: "nowrap", flexShrink: 0, overflowX: "auto", WebkitOverflowScrolling: "touch" as React.CSSProperties["WebkitOverflowScrolling"] }}>
         {roasters.map(r => (
           <div key={r.name} style={{ display: "flex", alignItems: "center", borderRadius: 20, border: `1px solid ${roasterFilter === r.name ? "var(--coffee)" : "var(--border)"}`, background: roasterFilter === r.name ? "var(--coffee)" : "var(--warm-white)", overflow: "hidden" }}>
             <button onClick={() => setRoasterFilter(roasterFilter === r.name ? "All" : r.name)}
@@ -121,11 +121,17 @@ export default function DiscoverPage() {
           </div>
         ))}
         <input type="text" placeholder="Search…" value={search} onChange={e => setSearch(e.target.value)}
-          style={{ padding: "6px 12px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--warm-white)", color: "var(--ink)", outline: "none", width: 180, fontFamily: "'Lato', sans-serif", marginLeft: "auto" }} />
-        <div style={{ fontSize: 12, color: "var(--ink-faint)" }}>{filtered.length} coffees</div>
+          style={{ padding: "6px 12px", border: "1px solid var(--border)", borderRadius: 4, fontSize: 13, background: "var(--warm-white)", color: "var(--ink)", outline: "none", width: 140, fontFamily: "'Lato', sans-serif", flexShrink: 0 }} />
       </div>
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "28px 48px" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px 16px" }}>
+        <style>{`
+          @media (min-width: 769px) {
+            .discover-pad { padding: 28px 48px !important; }
+            .discover-topbar { padding: 24px 48px !important; }
+            .discover-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)) !important; }
+          }
+        `}</style>
         {loading ? (
           <div style={{ textAlign: "center", padding: "60px 0", color: "var(--ink-faint)" }}>Loading…</div>
         ) : filtered.length === 0 ? (
@@ -133,7 +139,7 @@ export default function DiscoverPage() {
             {roasters.length === 0 ? "Add a roaster to get started." : "No available coffees found."}
           </div>
         ) : (
-          <div style={view === "grid" ? { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))", gap: 20 } : {}}>
+          <div className="discover-grid" style={view === "grid" ? { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 } : {}}>
             {filtered.map(c => view === "grid"
               ? <GridCard key={c.title + c.roaster} coffee={c} added={addedToLog.has(c.title)} onAdd={() => setAddedToLog(p => new Set(Array.from(p).concat(c.title)))} onHide={() => handleHide(c)} />
               : <ListRow key={c.title + c.roaster} coffee={c} added={addedToLog.has(c.title)} onAdd={() => setAddedToLog(p => new Set(Array.from(p).concat(c.title)))} onHide={() => handleHide(c)} />
