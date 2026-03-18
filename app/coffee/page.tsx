@@ -139,17 +139,25 @@ export default function CoffeePage() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <div style={{ padding: "60px 48px", color: "var(--ink-faint)", fontFamily: "'Lato', sans-serif" }}>Loading…</div>;
-  if (error) return <div style={{ padding: "60px 48px", color: "var(--terracotta)", fontFamily: "'Lato', sans-serif" }}>Error: {error}</div>;
+  if (loading) return <div style={{ padding: "60px 24px", color: "var(--ink-faint)", fontFamily: "'Lato', sans-serif" }}>Loading…</div>;
+  if (error) return <div style={{ padding: "60px 24px", color: "var(--terracotta)", fontFamily: "'Lato', sans-serif" }}>Error: {error}</div>;
   if (!stats) return null;
 
   return (
-    <div style={{ padding: "32px 48px", overflowY: "auto", height: "100vh", fontFamily: "'Lato', sans-serif" }}>
+    <div style={{ padding: "24px", overflowY: "auto", height: "100vh", fontFamily: "'Lato', sans-serif" }}>
+      <style>{`
+        @media (min-width: 769px) {
+          .coffee-pad { padding: 32px 48px !important; }
+          .grid-4 { grid-template-columns: repeat(4, 1fr) !important; }
+          .grid-2 { grid-template-columns: 1fr 1fr !important; }
+          .grid-4b { grid-template-columns: 1fr 1fr 1fr 1fr !important; }
+        }
+      `}</style>
       <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 28, marginBottom: 4 }}>Coffee</div>
       <div style={{ fontSize: 13, color: "var(--ink-faint)", marginBottom: 32 }}>Stats from your bag log</div>
 
       {/* Stats strip */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 24 }}>
+      <div className="grid-4" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 24 }}>
         <Card title="Bags Logged"><Stat label="total bags" value={stats.totalBags} /></Card>
         <Card title="Avg Rating"><Stat label="out of 10" value={stats.avgRating} /></Card>
         <Card title="Avg Bag Price"><Stat label="per bag" value={`$${stats.avgPrice}`} /></Card>
@@ -157,7 +165,7 @@ export default function CoffeePage() {
       </div>
 
       {/* Two tables side by side */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
+      <div className="grid-2" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, marginBottom: 24 }}>
         <Card title="Highest Rated Bags">
           <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
             {stats.topRated.map((b, i) => (
@@ -187,7 +195,7 @@ export default function CoffeePage() {
       </div>
 
       {/* Roasters + Countries + Process + Rating dist */}
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 16, marginBottom: 24 }}>
+      <div className="grid-4b" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16, marginBottom: 24 }}>
         <Card title="Top Roasters"><BarChart data={stats.topRoasters} /></Card>
         <Card title="Top Origins"><BarChart data={stats.topCountries} /></Card>
         <Card title="Process"><BarChart data={stats.topProcesses} /></Card>
