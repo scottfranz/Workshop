@@ -3,7 +3,8 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-interface CoffeeStats { totalBags: number; avgRating: number; topRated: { name: string; roaster: string; rating: number }[]; recentBags: { name: string; roaster: string; openDate: string; rating: number | null }[]; }interface BookItem { title: string; author: string; shelf: string; rating?: number | null; dateRead?: string | null; }
+interface CoffeeStats { totalBags: number; topRated: { name: string; roaster: string; rating: number }[]; recentBags: { name: string; roaster: string; openDate: string; rating: number | null }[]; }
+interface BookItem { title: string; author: string; shelf: string; rating?: number | null; dateRead?: string | null; }
 interface WatchItem { id: string; title: string; type: string; year: number; rating: number; date_watched: string; watchlist: boolean; }
 interface WritingItem { id: string; title: string; type: string; word_count: number; created_at: string; }
 
@@ -47,10 +48,17 @@ export default function HomePage() {
         <div style={{ fontSize: 13, color: "var(--ink-faint)", fontWeight: 300 }}>Here's what's happening across your projects</div>
       </div>
 
-      <div style={{ padding: "40px 48px", maxWidth: 1100 }}>
+      <style>{`
+        @media (min-width: 769px) {
+          .home-stats { grid-template-columns: repeat(4, 1fr) !important; }
+          .home-modules { grid-template-columns: repeat(2, 1fr) !important; }
+          .home-pad { padding: 40px 48px !important; }
+        }
+      `}</style>
+      <div className="home-pad" style={{ padding: "20px 16px", maxWidth: 1100 }}>
 
         {/* Summary strip */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 16, marginBottom: 48 }}>
+        <div className="home-stats" style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12, marginBottom: 32 }}>
           {summaryCards.map((c) => (
             <Link key={c.label} href={c.href} style={{ textDecoration: "none" }}>
               <div style={{ background: "var(--cream)", border: "1px solid var(--border)", borderRadius: 6, padding: "20px 24px", transition: "border-color 0.15s, transform 0.15s", cursor: "pointer" }}
@@ -69,7 +77,7 @@ export default function HomePage() {
           <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 16 }}>All Modules</span>
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 24, marginBottom: 48 }}>
+        <div className="home-modules" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16, marginBottom: 32 }}>
 
           {/* Coffee */}
           <ModuleCard href="/coffee" icon="☕" name="Coffee" tagline="Bag log · Roaster feed" accent="rgba(107,66,38,0.1)" recentLabel="Recently Opened">
