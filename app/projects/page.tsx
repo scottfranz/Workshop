@@ -74,17 +74,28 @@ export default function ProjectsPage() {
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100vh" }}>
       {/* Header */}
-      <div style={{ padding: "24px 48px", borderBottom: "1px solid var(--border)", background: "var(--warm-white)", flexShrink: 0 }}>
+      <div style={{ padding: "16px 20px", borderBottom: "1px solid var(--border)", background: "var(--warm-white)", flexShrink: 0 }} className="proj-header">
         <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 26 }}>Projects</div>
         <div style={{ fontSize: 13, color: "var(--ink-faint)", fontWeight: 300 }}>Digital ideas · apps · sites · tools</div>
       </div>
 
       {/* Board */}
-      <div style={{ flex: 1, overflowY: "auto", padding: "28px 48px" }}>
+      <div style={{ flex: 1, overflowY: "auto", padding: "16px" }} className="proj-pad">
+        <style>{`
+          @media (min-width: 769px) {
+            .proj-header { padding: 24px 48px !important; }
+            .proj-pad { padding: 28px 48px !important; }
+            .proj-board { grid-template-columns: repeat(4, minmax(0, 1fr)) !important; }
+            .proj-status-tag { display: none !important; }
+          }
+          @media (max-width: 768px) {
+            .proj-col-header { display: none !important; }
+          }
+        `}</style>
         {loading ? (
           <div style={{ color: "var(--ink-faint)", fontFamily: "'Lato', sans-serif" }}>Loading…</div>
         ) : (
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 16 }}>
+          <div className="proj-board" style={{ display: "grid", gridTemplateColumns: "1fr", gap: 16 }}>
             {COLUMNS.map(col => (
               <div key={col.id}
                 onDragOver={e => { e.preventDefault(); setDragOver(col.id); }}
@@ -92,7 +103,7 @@ export default function ProjectsPage() {
                 onDrop={e => { e.preventDefault(); if (dragId) handleMove(dragId, col.id); setDragId(null); setDragOver(null); }}
                 style={{ background: dragOver === col.id ? "rgba(107,66,38,0.04)" : "transparent", borderRadius: 8, transition: "background 0.15s", minHeight: 200 }}>
                 {/* Column header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, padding: "0 2px" }}>
+                <div className="proj-col-header" style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 10, padding: "0 2px" }}>
                   <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
                     <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-faint)", fontFamily: "'Lato', sans-serif" }}>{col.label}</span>
                     <span style={{ fontSize: 11, background: "var(--border)", color: "var(--ink-faint)", borderRadius: 10, padding: "1px 7px", fontFamily: "'Lato', sans-serif" }}>{colProjects(col.id).length}</span>
@@ -102,14 +113,17 @@ export default function ProjectsPage() {
                 {/* Cards */}
                 <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                   {colProjects(col.id).map(p => (
-                    <div key={p.id} draggable
+                      <div key={p.id} draggable
                       onDragStart={() => setDragId(p.id)}
                       onDragEnd={() => { setDragId(null); setDragOver(null); }}
                       onClick={() => setModal({ mode: "edit", project: p })}
                       style={{ background: "var(--warm-white)", border: `1px solid ${dragId === p.id ? "var(--coffee)" : "var(--border)"}`, borderRadius: 8, padding: "12px 14px", cursor: "grab", opacity: dragId === p.id ? 0.5 : 1, transition: "border-color 0.15s, transform 0.15s", fontFamily: "'Lato', sans-serif" }}
                       onMouseEnter={e => (e.currentTarget as HTMLDivElement).style.transform = "translateY(-1px)"}
                       onMouseLeave={e => (e.currentTarget as HTMLDivElement).style.transform = ""}>
-                      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", marginBottom: p.description ? 5 : 8, lineHeight: 1.35 }}>{p.title}</div>
+                      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 5 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--ink)", lineHeight: 1.35 }}>{p.title}</div>
+                        <span className="proj-status-tag" style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.08em", textTransform: "uppercase", color: "var(--ink-faint)", background: "var(--border)", borderRadius: 8, padding: "2px 7px", flexShrink: 0, marginLeft: 8 }}>{COLUMNS.find(c => c.id === p.status)?.label}</span>
+                      </div>
                       {p.description && <div style={{ fontSize: 12, color: "var(--ink-faint)", lineHeight: 1.45, marginBottom: 8 }}>{p.description}</div>}
                       {p.tags?.length > 0 && (
                         <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>

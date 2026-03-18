@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 
-interface CoffeeStats { totalBags: number; topRated: { name: string; roaster: string; rating: number }[]; recentBags: { name: string; roaster: string; openDate: string; rating: number | null }[]; }
+interface CoffeeStats { totalBags: number; avgRating: number; topRated: { name: string; roaster: string; rating: number }[]; recentBags: { name: string; roaster: string; openDate: string; rating: number | null }[]; }
 interface BookItem { title: string; author: string; shelf: string; rating?: number | null; dateRead?: string | null; }
 interface WatchItem { id: string; title: string; type: string; year: number; rating: number; date_watched: string; watchlist: boolean; }
 interface WritingItem { id: string; title: string; type: string; word_count: number; created_at: string; }
