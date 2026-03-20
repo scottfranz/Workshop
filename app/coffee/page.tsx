@@ -2,13 +2,15 @@
 
 import { useEffect, useState } from "react";
 
+interface BagRow { name: string; roaster: string; country: string; process: string; roastLevel: string; rating: number | null; openDate: string; price: string; }
+
 interface Stats {
   totalBags: number; avgRating: number; avgPrice: number; avgCupPrice: number;
   topRoasters: [string, number][]; topCountries: [string, number][];
   topProcesses: [string, number][]; ratingBuckets: { label: string; count: number }[];
   topRated: { name: string; roaster: string; rating: number }[];
   recentBags: { name: string; roaster: string; openDate: string; rating: number | null }[];
-  ratingsOverTime: { date: string; rating: number; name: string; roaster: string }[];
+  allBags: BagRow[];
 }
 
 const COLORS = ["#c0622a","#7a9e7e","#5b8fa8","#a0627a","#8a7ab8","#b8874a","#5b9e8a","#c05a5a","#6a8fb8","#9e7a3a","#b85a8a","#6aab6a"];
@@ -18,12 +20,12 @@ function BarChart({ data }: { data: [string, number][] }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       {data.map(([label, count], i) => (
-        <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-          <div style={{ width: 110, fontSize: 12, color: "var(--ink-light)", textAlign: "right", flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
-          <div style={{ flex: 1, height: 22, background: "var(--border)", borderRadius: 3, overflow: "hidden" }}>
+        <div key={label} style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ width: "30%", fontSize: 11, color: "var(--ink-light)", textAlign: "right", flexShrink: 0, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{label}</div>
+          <div style={{ flex: 1, height: 20, background: "var(--border)", borderRadius: 3, overflow: "hidden" }}>
             <div style={{ width: `${(Number(count) / max) * 100}%`, height: "100%", background: COLORS[i % COLORS.length], borderRadius: 3, transition: "width 0.6s ease", minWidth: 2 }} />
           </div>
-          <div style={{ fontSize: 11, color: "var(--ink-faint)", fontWeight: 700, width: 20, flexShrink: 0 }}>{count}</div>
+          <div style={{ fontSize: 11, color: "var(--ink-faint)", fontWeight: 700, width: 18, flexShrink: 0, textAlign: "right" }}>{count}</div>
         </div>
       ))}
     </div>
@@ -47,66 +49,6 @@ function RatingChart({ data }: { data: { label: string; count: number }[] }) {
   );
 }
 
-
-function LineChart({ data }: { data: { date: string; rating: number; name: string; roaster: string }[] }) {
-  if (data.length === 0) return <div style={{ color: "var(--ink-faint)", fontSize: 13 }}>No data</div>;
-
-  const W = 800, H = 160, PAD = { top: 16, right: 16, bottom: 32, left: 36 };
-  const innerW = W - PAD.left - PAD.right;
-  const innerH = H - PAD.top - PAD.bottom;
-
-  const minR = 0, maxR = 10;
-  const toY = (r: number) => PAD.top + innerH - ((r - minR) / (maxR - minR)) * innerH;
-  const toX = (i: number) => PAD.left + (i / (data.length - 1)) * innerW;
-
-  const points = data.map((d, i) => ({ x: toX(i), y: toY(d.rating), ...d }));
-  const polyline = points.map(p => `${p.x},${p.y}`).join(" ");
-
-  // Y axis labels
-  const yTicks = [0, 2, 4, 6, 8, 10];
-
-  // X axis: show ~6 evenly spaced date labels
-  const xTickCount = Math.min(6, data.length);
-  const xTicks = Array.from({ length: xTickCount }, (_, i) => {
-    const idx = Math.round((i / (xTickCount - 1)) * (data.length - 1));
-    return { idx, label: new Date(data[idx].date + "T12:00:00").toLocaleDateString("en-US", { month: "short", year: "2-digit" }) };
-  });
-
-  const [tooltip, setTooltip] = useState<{ x: number; y: number; d: typeof points[0] } | null>(null);
-
-  return (
-    <div style={{ position: "relative" }}>
-      <svg viewBox={`0 0 ${W} ${H}`} style={{ width: "100%", height: "auto", display: "block" }}>
-        {/* Grid lines */}
-        {yTicks.map(t => (
-          <g key={t}>
-            <line x1={PAD.left} x2={W - PAD.right} y1={toY(t)} y2={toY(t)} stroke="var(--border)" strokeWidth={1} />
-            <text x={PAD.left - 6} y={toY(t)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="var(--ink-faint)">{t}</text>
-          </g>
-        ))}
-        {/* X axis labels */}
-        {xTicks.map(({ idx, label }) => (
-          <text key={idx} x={toX(idx)} y={H - 6} textAnchor="middle" fontSize={10} fill="var(--ink-faint)">{label}</text>
-        ))}
-        {/* Line */}
-        <polyline points={polyline} fill="none" stroke="var(--coffee)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-        {/* Dots */}
-        {points.map((p, i) => (
-          <circle key={i} cx={p.x} cy={p.y} r={3} fill="var(--coffee)"
-            onMouseEnter={() => setTooltip({ x: p.x, y: p.y, d: p })}
-            onMouseLeave={() => setTooltip(null)}
-            style={{ cursor: "pointer" }} />
-        ))}
-      </svg>
-      {tooltip && (
-        <div style={{ position: "absolute", left: `${(tooltip.x / W) * 100}%`, top: `${(tooltip.y / H) * 100}%`, transform: "translate(-50%, -110%)", background: "var(--ink)", color: "var(--cream)", borderRadius: 6, padding: "6px 10px", fontSize: 11, pointerEvents: "none", whiteSpace: "nowrap", zIndex: 10 }}>
-          <div style={{ fontWeight: 700 }}>{tooltip.d.rating} — {tooltip.d.name}</div>
-          <div style={{ opacity: 0.75 }}>{tooltip.d.roaster} · {new Date(tooltip.d.date + "T12:00:00").toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}</div>
-        </div>
-      )}
-    </div>
-  );
-}
 
 function Card({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -202,9 +144,33 @@ export default function CoffeePage() {
         <Card title="Rating Distribution"><RatingChart data={stats.ratingBuckets} /></Card>
       </div>
 
-      {/* Ratings over time */}
-      <Card title="Ratings Over Time">
-        <LineChart data={stats.ratingsOverTime} />
+      {/* All bags table */}
+      <Card title="All Bags">
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "'Lato', sans-serif" }}>
+            <thead>
+              <tr style={{ borderBottom: "2px solid var(--border)" }}>
+                {["Rating","Name","Roaster","Country","Process","Opened"].map(h => (
+                  <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-faint)", whiteSpace: "nowrap" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {stats.allBags.map((b, i) => (
+                <tr key={i} style={{ borderBottom: "1px solid var(--border)" }}
+                  onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = "var(--cream)"}
+                  onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = ""}>
+                  <td style={{ padding: "8px 10px", fontFamily: "'Playfair Display', serif", fontWeight: 700, color: "var(--coffee)", whiteSpace: "nowrap" }}>{b.rating ?? "—"}</td>
+                  <td style={{ padding: "8px 10px", fontWeight: 600, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--ink-light)", whiteSpace: "nowrap" }}>{b.roaster}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--ink-light)", whiteSpace: "nowrap" }}>{b.country?.split(" - ")[0]}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--ink-light)", whiteSpace: "nowrap" }}>{b.process}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--ink-faint)", whiteSpace: "nowrap" }}>{b.openDate}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </Card>
     </div>
   );

@@ -184,3 +184,56 @@ export function getEntryStartingTomorrow(entries: RegaliaEntry[]): RegaliaEntry 
   const tomorrowStr = tomorrow.toISOString().split("T")[0];
   return entries.find(e => e.startDate === tomorrowStr) ?? null;
 }
+
+// ─── Tandem Sampler Scraper ───────────────────────────────────────────────────
+
+export interface TandemEntry {
+  name: string;
+  origin: string | null;
+}
+
+const TANDEM_URL = "https://www.tandemcoffee.com/products/tandem-sampler";
+
+export async function fetchTandemSampler(): Promise<{
+  entries: TandemEntry[];
+  fetchedAt: string;
+  error: string | null;
+}> {
+  const fetchedAt = new Date().toISOString();
+  try {
+    const res = await fetch(TANDEM_URL, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      signal: AbortSignal.timeout(12000),
+    });
+    if (!res.ok) return { entries: [], fetchedAt, error: `HTTP ${res.status}` };
+
+    const html = await res.text();
+
+    // Find the section after "Today's sampler includes"
+    const marker = "Today's sampler includes";
+    const idx = html.indexOf(marker);
+    if (idx === -1) return { entries: [], fetchedAt, error: "Could not find sampler section on page" };
+
+    // Grab the next 1500 chars and strip tags
+    const chunk = html.slice(idx, idx + 1500);
+    const text = chunk.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
+
+    // Match lines like: "Faver Ninco Gesha (Huila, Colombia)"
+    const matches = Array.from(text.matchAll(/([A-Z][^()]{3,60}?)\s*\(([^)]+)\)/g));
+
+    const entries: TandemEntry[] = matches
+      .map(m => ({ name: m[1].trim(), origin: m[2].trim() }))
+      .filter(e => e.name.length > 3 && !e.name.toLowerCase().includes("sampler") && !e.name.toLowerCase().includes("typography") && !e.name.toLowerCase().includes("font"));
+
+    if (entries.length === 0) return { entries: [], fetchedAt, error: "No coffees found in sampler section" };
+
+    return { entries, fetchedAt, error: null };
+  } catch (err) {
+    return { entries: [], fetchedAt, error: String(err) };
+  }
+}
+
+export function tandemSamplersAreDifferent(a: TandemEntry[], b: TandemEntry[]): boolean {
+  if (a.length !== b.length) return true;
+  return a.some((entry, i) => entry.name !== b[i]?.name);
+}

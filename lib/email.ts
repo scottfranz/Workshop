@@ -108,3 +108,31 @@ export function shippingReminderEmail(entry: {
       </div>
     </div>`;
 }
+
+export function tandemSamplerEmail(entries: Array<{ name: string; origin: string | null }>): string {
+  const rows = entries.map(e => `
+    <tr>
+      <td style="padding:12px 16px; border-bottom:1px solid #DDD5C8">
+        <strong style="font-size:14px; color:#1E1A14">${e.name}</strong>
+        ${e.origin ? `<span style="color:#8C8070; font-size:13px"> · ${e.origin}</span>` : ""}
+      </td>
+    </tr>`).join("");
+
+  return `
+    <div style="font-family:'Georgia',serif; max-width:600px; margin:0 auto; background:#FAF8F3; border:1px solid #DDD5C8; border-radius:8px; overflow:hidden">
+      <div style="background:#1E1A14; padding:28px 32px">
+        <div style="font-size:20px; color:#F5F0E8; font-style:italic">The Workshop</div>
+        <div style="font-size:11px; color:#8C8070; letter-spacing:0.12em; text-transform:uppercase; margin-top:4px">Coffee · Tandem Sampler update</div>
+      </div>
+      <div style="padding:32px">
+        <h2 style="font-size:22px; color:#1E1A14; margin:0 0 8px">Tandem's sampler has changed ☕</h2>
+        <p style="color:#4A4438; font-size:14px; line-height:1.6; margin:0 0 28px">The Single Origin Sampler Pack is now featuring these four coffees:</p>
+        <table style="width:100%; border-collapse:collapse; border:1px solid #DDD5C8; border-radius:6px; overflow:hidden">
+          <tbody>${rows}</tbody>
+        </table>
+        <p style="margin:24px 0 0; font-size:12px; color:#8C8070">
+          <a href="https://www.tandemcoffee.com/products/tandem-sampler" style="color:#C4956A">View on Tandem ↗</a>
+        </p>
+      </div>
+    </div>`;
+}

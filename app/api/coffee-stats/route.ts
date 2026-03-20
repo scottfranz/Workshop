@@ -79,6 +79,21 @@ export async function GET() {
       .filter((r: {date:string; rating:number}) => r.date && !isNaN(r.rating))
       .sort((a: {date:string}, b: {date:string}) => a.date.localeCompare(b.date));
 
+    // All bags for table — sorted by opened date desc
+    const allBags = rows
+      .filter((r: Record<string,string>) => r["Roaster"] && r["Name"])
+      .map((r: Record<string,string>) => ({
+        name: r["Name"],
+        roaster: r["Roaster"],
+        country: r["Country"],
+        process: r["Process"],
+        roastLevel: r["Roast Level"],
+        rating: r["My Rating"] ? parseFloat(r["My Rating"]) : null,
+        openDate: r["Opened Bag Date"] ?? "",
+        price: r["Price I Paid"] ?? "",
+      }))
+      .sort((a: {openDate:string}, b: {openDate:string}) => b.openDate.localeCompare(a.openDate));
+
     return NextResponse.json({
       totalBags: rows.length,
       avgRating: ratings.length ? +(ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length).toFixed(2) : 0,
@@ -91,6 +106,7 @@ export async function GET() {
       topRated,
       recentBags,
       ratingsOverTime,
+      allBags,
     });
   } catch (err) {
     return NextResponse.json({ error: String(err) }, { status: 500 });
