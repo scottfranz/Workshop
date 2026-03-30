@@ -88,11 +88,17 @@ export async function GET() {
         country: r["Country"],
         process: r["Process"],
         roastLevel: r["Roast Level"],
+        variety: r["Variety"] ?? "",
+        roasterNotes: r["Roaster Notes"] ?? "",
         rating: r["My Rating"] ? parseFloat(r["My Rating"]) : null,
         openDate: r["Opened Bag Date"] ?? "",
+        roastDate: r["Roast Date"] ?? "",
         price: r["Price I Paid"] ?? "",
       }))
-      .sort((a: {openDate:string}, b: {openDate:string}) => b.openDate.localeCompare(a.openDate));
+      .sort((a: {roastDate:string}, b: {roastDate:string}) => {
+        const parse = (d: string) => { const p = d.split("/"); return p.length >= 3 ? `${p[2].length === 2 ? "20"+p[2] : p[2]}-${p[0].padStart(2,"0")}-${p[1].padStart(2,"0")}` : ""; };
+        return parse(b.roastDate).localeCompare(parse(a.roastDate));
+      });
 
     return NextResponse.json({
       totalBags: rows.length,

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 
-interface BagRow { name: string; roaster: string; country: string; process: string; roastLevel: string; rating: number | null; openDate: string; price: string; }
+interface BagRow { name: string; roaster: string; country: string; process: string; roastLevel: string; variety: string; roasterNotes: string; rating: number | null; openDate: string; roastDate: string; price: string; }
 
 interface Stats {
   totalBags: number; avgRating: number; avgPrice: number; avgCupPrice: number;
@@ -150,7 +150,7 @@ export default function CoffeePage() {
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12, fontFamily: "'Lato', sans-serif" }}>
             <thead>
               <tr style={{ borderBottom: "2px solid var(--border)" }}>
-                {["Rating","Name","Roaster","Country","Process","Opened"].map(h => (
+                {["Rating","Name","Roaster","Country","Process","Variety","Roast Date"].map(h => (
                   <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: "var(--ink-faint)", whiteSpace: "nowrap" }}>{h}</th>
                 ))}
               </tr>
@@ -161,11 +161,15 @@ export default function CoffeePage() {
                   onMouseEnter={e => (e.currentTarget as HTMLTableRowElement).style.background = "var(--cream)"}
                   onMouseLeave={e => (e.currentTarget as HTMLTableRowElement).style.background = ""}>
                   <td style={{ padding: "8px 10px", fontFamily: "'Playfair Display', serif", fontWeight: 700, color: "var(--coffee)", whiteSpace: "nowrap" }}>{b.rating ?? "—"}</td>
-                  <td style={{ padding: "8px 10px", fontWeight: 600, maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{b.name}</td>
+                  <td style={{ padding: "8px 10px", maxWidth: 200, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                    <div style={{ fontWeight: 600 }}>{b.name}</div>
+                    {b.roasterNotes && <div style={{ fontSize: 11, color: "var(--ink-faint)", marginTop: 2, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 200 }}>{b.roasterNotes}</div>}
+                  </td>
                   <td style={{ padding: "8px 10px", color: "var(--ink-light)", whiteSpace: "nowrap" }}>{b.roaster}</td>
                   <td style={{ padding: "8px 10px", color: "var(--ink-light)", whiteSpace: "nowrap" }}>{b.country?.split(" - ")[0]}</td>
                   <td style={{ padding: "8px 10px", color: "var(--ink-light)", whiteSpace: "nowrap" }}>{b.process}</td>
-                  <td style={{ padding: "8px 10px", color: "var(--ink-faint)", whiteSpace: "nowrap" }}>{b.openDate}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--ink-light)", whiteSpace: "nowrap" }}>{b.variety}</td>
+                  <td style={{ padding: "8px 10px", color: "var(--ink-faint)", whiteSpace: "nowrap" }}>{b.roastDate}</td>
                 </tr>
               ))}
             </tbody>
