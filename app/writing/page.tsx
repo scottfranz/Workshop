@@ -1,5 +1,5 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 
 interface Entry {
   id: string; title: string; body: string; type: "journal"|"draft"|"note";
@@ -14,6 +14,8 @@ const TYPE_META = {
 
 function wc(text: string) { return text.trim().split(/\s+/).filter(Boolean).length; }
 
+type SaveStatus = "idle" | "saving" | "saved";
+
 export default function WritingPage() {
   const [entries, setEntries] = useState<Entry[]>([]);
   const [loading, setLoading] = useState(true);
@@ -24,58 +26,134 @@ export default function WritingPage() {
   const [body, setBody] = useState("");
   const [type, setType] = useState<"journal"|"draft"|"note">("journal");
   const [isPublic, setIsPublic] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<SaveStatus>("idle");
+
+  // Refs so the autosave callback always sees latest values
+  const selectedRef = useRef<Entry|null>(null);
+  const titleRef = useRef("");
+  const bodyRef = useRef("");
+  const typeRef = useRef<"journal"|"draft"|"note">("journal");
+  const isPublicRef = useRef(false);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedIdRef = useRef<string|null>(null); // tracks id after first autosave of a new entry
+
+  useEffect(() => { selectedRef.current = selected; }, [selected]);
+  useEffect(() => { titleRef.current = title; }, [title]);
+  useEffect(() => { bodyRef.current = body; }, [body]);
+  useEffect(() => { typeRef.current = type; }, [type]);
+  useEffect(() => { isPublicRef.current = isPublic; }, [isPublic]);
 
   useEffect(() => {
     fetch("/api/writing").then(r => r.json()).then(d => { setEntries(Array.isArray(d) ? d : []); setLoading(false); });
   }, []);
 
-  async function saveEntry() {
-    const payload = { title, body, type, is_public: isPublic, word_count: wc(body) };
-    if (selected) {
-      const res = await fetch("/api/writing", { method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ id: selected.id, ...payload }) });
+  // Core save — does not navigate; returns the saved entry
+  const doSave = useCallback(async (): Promise<Entry | null> => {
+    const t = titleRef.current;
+    const b = bodyRef.current;
+    if (!t && !b) return null;
+
+    const payload = { title: t, body: b, type: typeRef.current, is_public: isPublicRef.current, word_count: wc(b) };
+
+    // Determine which id to update: existing entry, or an id created by a prior autosave
+    const existingId = selectedRef.current?.id ?? savedIdRef.current;
+
+    if (existingId) {
+      const res = await fetch("/api/writing", { method:"PUT", headers:{"Content-Type":"application/json"}, body: JSON.stringify({ id: existingId, ...payload }) });
       const data = await res.json();
-      setEntries(prev => prev.map(e => e.id === selected.id ? data : e));
+      setEntries(prev => prev.map(e => e.id === existingId ? data : e));
+      return data;
     } else {
       const res = await fetch("/api/writing", { method:"POST", headers:{"Content-Type":"application/json"}, body: JSON.stringify(payload) });
       const data = await res.json();
+      savedIdRef.current = data.id; // remember for subsequent autosaves
       setEntries(prev => [data, ...prev]);
+      return data;
+    }
+  }, []);
+
+  // Autosave: debounce 1.5s after any content change while in write view
+  useEffect(() => {
+    if (view !== "write") return;
+    if (!title && !body) return;
+
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+
+    saveTimer.current = setTimeout(async () => {
+      setSaveStatus("saving");
+      await doSave();
+      setSaveStatus("saved");
+      setTimeout(() => setSaveStatus("idle"), 2000);
+    }, 1500);
+
+    return () => { if (saveTimer.current) clearTimeout(saveTimer.current); };
+  }, [title, body, type, isPublic, view, doSave]);
+
+  // Cancel: flush any pending save then go back
+  async function handleCancel() {
+    if (saveTimer.current) {
+      clearTimeout(saveTimer.current);
+      saveTimer.current = null;
+    }
+    if ((title || body)) {
+      setSaveStatus("saving");
+      await doSave();
     }
     setView("list"); setSelected(null); setTitle(""); setBody("");
+    savedIdRef.current = null;
+    setSaveStatus("idle");
   }
 
   function openEditor(entry?: Entry) {
+    savedIdRef.current = null;
     if (entry) { setSelected(entry); setTitle(entry.title); setBody(entry.body); setType(entry.type); setIsPublic(entry.is_public); }
     else { setSelected(null); setTitle(""); setBody(""); setType("journal"); setIsPublic(false); }
+    setSaveStatus("idle");
     setView("write");
   }
 
   const filtered = entries.filter(e => typeFilter === "all" || e.type === typeFilter);
-  const inp = { padding:"9px 12px", border:"1px solid var(--border)", borderRadius:4, fontSize:13, fontFamily:"'Lato', sans-serif", color:"var(--ink)", background:"var(--warm-white)", outline:"none", width:"100%" };
+
+  const statusLabel =
+    saveStatus === "saving" ? "Saving…" :
+    saveStatus === "saved"  ? "✓ Saved" :
+    "";
 
   if (view === "write") return (
     <div style={{ display:"flex", flexDirection:"column", height:"100vh" }}>
-      <div style={{ padding:"16px 48px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", gap:12, flexShrink:0 }}>
+      <style>{`
+        .write-toolbar { padding: 10px 48px; gap: 10px; }
+        .write-toolbar-row2 { display: flex; align-items: center; gap: 10px; }
+        @media (max-width: 600px) {
+          .write-toolbar { padding: 10px 16px !important; flex-wrap: wrap; }
+          .write-toolbar-row2 { width: 100%; }
+        }
+      `}</style>
+      <div className="write-toolbar" style={{ borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", flexShrink:0 }}>
+        {/* Row 1: type selector + public toggle */}
         <div style={{ display:"flex", border:"1px solid var(--border)", borderRadius:6, overflow:"hidden" }}>
           {Object.entries(TYPE_META).map(([key,meta]) => (
-            <button key={key} onClick={() => setType(key as any)} style={{ padding:"6px 14px", fontSize:12, fontFamily:"'Lato', sans-serif", border:"none", background:type===key?"var(--ink)":"var(--warm-white)", color:type===key?"var(--cream)":"var(--ink-faint)", fontWeight:type===key?700:400, cursor:"pointer" }}>
+            <button key={key} onClick={() => setType(key as any)} style={{ padding:"8px 14px", fontSize:12, fontFamily:"'Lato', sans-serif", border:"none", background:type===key?"var(--ink)":"var(--warm-white)", color:type===key?"var(--cream)":"var(--ink-faint)", fontWeight:type===key?700:400, cursor:"pointer" }}>
               {meta.icon} {meta.label}
             </button>
           ))}
         </div>
-        <button onClick={() => setIsPublic(!isPublic)} style={{ padding:"6px 14px", border:"1px solid var(--border)", borderRadius:6, background:"var(--warm-white)", cursor:"pointer", fontSize:12, fontFamily:"'Lato', sans-serif", color:isPublic?"var(--gold)":"var(--ink-faint)", fontWeight:isPublic?700:400 }}>
+        <button onClick={() => setIsPublic(!isPublic)} style={{ padding:"8px 14px", border:"1px solid var(--border)", borderRadius:6, background:"var(--warm-white)", cursor:"pointer", fontSize:12, fontFamily:"'Lato', sans-serif", color:isPublic?"var(--gold)":"var(--ink-faint)", fontWeight:isPublic?700:400, whiteSpace:"nowrap" }}>
           {isPublic ? "🔓 Public" : "🔒 Private"}
         </button>
-        <div style={{ flex:1 }} />
-        <div style={{ fontSize:12, color:"var(--ink-faint)" }}>{wc(body)} words</div>
-        <button onClick={saveEntry} style={{ padding:"7px 20px", background:"var(--ink)", color:"var(--cream)", border:"none", borderRadius:4, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'Lato', sans-serif" }}>Save</button>
-        <button onClick={() => { setView("list"); setSelected(null); }} style={{ padding:"7px 16px", background:"transparent", border:"1px solid var(--border)", borderRadius:4, fontSize:13, cursor:"pointer", fontFamily:"'Lato', sans-serif", color:"var(--ink-faint)" }}>Cancel</button>
+        {/* Row 2 (same row on desktop, wraps on mobile): spacer + word count + status + back */}
+        <div className="write-toolbar-row2" style={{ flex:1, justifyContent:"flex-end" }}>
+          <div style={{ fontSize:12, color:"var(--ink-faint)" }}>{wc(body)} words</div>
+          <div style={{ fontSize:12, color: saveStatus === "saved" ? "var(--sage)" : "var(--ink-faint)", minWidth:56, textAlign:"right", transition:"color 0.2s" }}>
+            {statusLabel}
+          </div>
+          <button onClick={handleCancel} style={{ padding:"7px 16px", background:"transparent", border:"1px solid var(--border)", borderRadius:4, fontSize:13, cursor:"pointer", fontFamily:"'Lato', sans-serif", color:"var(--ink-faint)", whiteSpace:"nowrap" }}>← Back</button>
+        </div>
       </div>
-      <div style={{ padding:"32px 48px 0" }}>
+      <div style={{ flex:1, overflowY:"auto", padding:"32px clamp(16px, 5vw, 48px) 48px" }}>
         <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Title" style={{ width:"100%", fontFamily:"'Playfair Display', serif", fontSize:28, fontWeight:600, border:"none", outline:"none", background:"transparent", color:"var(--ink)", marginBottom:8 }} />
         <div style={{ fontSize:12, color:"var(--ink-faint)", marginBottom:20 }}>{new Date().toLocaleDateString("en-US",{weekday:"long",month:"long",day:"numeric",year:"numeric"})}</div>
         <div style={{ height:1, background:"var(--border)", marginBottom:24 }} />
-      </div>
-      <div style={{ flex:1, padding:"0 48px 48px", overflowY:"auto" }}>
         <textarea value={body} onChange={e => setBody(e.target.value)} placeholder="Start writing…" style={{ width:"100%", minHeight:320, fontFamily:"'Lato', sans-serif", fontSize:15, lineHeight:1.85, border:"none", outline:"none", background:"transparent", color:"var(--ink-light)", resize:"none" }} />
       </div>
     </div>

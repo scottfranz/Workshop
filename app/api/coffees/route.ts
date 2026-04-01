@@ -9,6 +9,7 @@ export interface CoffeeProduct {
   title: string; price: number | null; available: boolean;
   url: string; image: string | null; roaster: string;
   roasterColor: string; type: "roasted" | "green";
+  published_at: string | null;
 }
 
 interface Roaster {
@@ -28,7 +29,7 @@ async function fetchShopify(roaster: Roaster): Promise<CoffeeProduct[]> {
     if (SKIP_KEYWORDS.some((k) => tl.includes(k))) continue;
     if (["merchandise","equipment","accessory"].some((k) => tyl.includes(k))) continue;
     const prices: number[] = (p.variants ?? []).map((v: {price:string}) => parseFloat(v.price)).filter((n:number) => !isNaN(n));
-    products.push({ title: p.title ?? "", price: prices.length ? Math.min(...prices) : null, available: (p.variants ?? []).some((v:{available:boolean}) => v.available), url: `${roaster.url}/products/${p.handle ?? ""}`, image: p.images?.[0]?.src ?? null, roaster: roaster.name, roasterColor: roaster.color ?? "#888", type: roaster.type });
+    products.push({ title: p.title ?? "", price: prices.length ? Math.min(...prices) : null, available: (p.variants ?? []).some((v:{available:boolean}) => v.available), url: `${roaster.url}/products/${p.handle ?? ""}`, image: p.images?.[0]?.src ?? null, roaster: roaster.name, roasterColor: roaster.color ?? "#888", type: roaster.type, published_at: p.published_at ?? null });
   }
   return products;
 }
@@ -45,7 +46,7 @@ async function fetchWooCommerce(roaster: Roaster): Promise<CoffeeProduct[]> {
     if (!Array.isArray(data) || data.length === 0) break;
     for (const p of data) {
       const prices = [p.price, p.regular_price, p.sale_price].map((v:string) => parseFloat(v)).filter((n:number) => !isNaN(n) && n > 0);
-      products.push({ title: p.name ?? "", price: prices.length ? Math.min(...prices) : null, available: p.stock_status === "instock", url: p.permalink ?? roaster.url, image: p.images?.[0]?.src ?? null, roaster: roaster.name, roasterColor: roaster.color ?? "#888", type: roaster.type });
+      products.push({ title: p.name ?? "", price: prices.length ? Math.min(...prices) : null, available: p.stock_status === "instock", url: p.permalink ?? roaster.url, image: p.images?.[0]?.src ?? null, roaster: roaster.name, roasterColor: roaster.color ?? "#888", type: roaster.type, published_at: p.date_created ?? null });
     }
     if (data.length < 50) break;
     page++;

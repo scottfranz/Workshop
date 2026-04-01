@@ -65,7 +65,7 @@ async function saveEntry(body: Partial<WatchEntry>) {
 }
 
 // ── Log Modal ─────────────────────────────────────────────────────────────────
-function LogModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function LogModal({ onClose, onSaved, watchlistEntries }: { onClose: () => void; onSaved: () => void; watchlistEntries: WatchEntry[] }) {
   const [type, setType] = useState<"movie"|"tv">("movie");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TmdbResult[]>([]);
@@ -97,7 +97,7 @@ function LogModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
   async function handleSave() {
     if (!selected) return;
     setSaving(true);
-    await saveEntry({
+    const payload = {
       title: selected.title, type, year: selected.year, director: selected.director,
       runtime: selected.runtime, seasons: selected.seasons ?? null,
       season_from: selected.seasons ? parseInt(seasonFrom) : null,
@@ -105,7 +105,13 @@ function LogModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
       tv_status: selected.seasons ? tvStatus : null,
       rating, date_watched: dateWatched, genre: selected.genre,
       poster: selected.poster, tmdb_id: selected.id, watchlist: false,
-    });
+    };
+    const existingWatchlistEntry = watchlistEntries.find(e => e.tmdb_id === selected.id);
+    if (existingWatchlistEntry) {
+      await fetch("/api/movies", { method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id: existingWatchlistEntry.id, ...payload }) });
+    } else {
+      await saveEntry(payload);
+    }
     setSaving(false);
     setStep("success");
     onSaved();
@@ -258,13 +264,13 @@ function LogModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => vo
 }
 
 // ── Watchlist Modal ────────────────────────────────────────────────────────────
-function WatchlistModal({ onClose, onSaved }: { onClose: () => void; onSaved: () => void }) {
+function WatchlistModal({ onClose, onSaved, watchlistIds }: { onClose: () => void; onSaved: () => void; watchlistIds: Set<number> }) {
   const [type, setType] = useState<"movie"|"tv">("movie");
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<TmdbResult[]>([]);
   const [searching, setSearching] = useState(false);
   const [saving, setSaving] = useState<number | null>(null);
-  const [saved, setSaved] = useState<number[]>([]);
+  const [saved, setSaved] = useState<number[]>(Array.from(watchlistIds));
 
   async function handleSearch() {
     if (!query.trim()) return;
@@ -349,8 +355,14 @@ export default function WatchingPage() {
 
   useEffect(() => { loadEntries(); }, []);
 
+  async function handleRemoveFromWatchlist(id: string) {
+    setEntries(prev => prev.filter(e => e.id !== id));
+    await fetch("/api/movies", { method: "DELETE", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ id }) });
+  }
+
   const watched = entries.filter(e => !e.watchlist);
   const watchlist = entries.filter(e => e.watchlist);
+  const watchlistIds = new Set(watchlist.map(e => e.tmdb_id).filter(Boolean) as number[]);
   const filtered = watched.filter(e => typeFilter === "all" || e.type === typeFilter);
   const months = groupByMonth(filtered);
 
@@ -445,8 +457,16 @@ export default function WatchingPage() {
         {!loading && tab === "watchlist" && (
           <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill, minmax(108px, 1fr))", gap:28 }}>
             {watchlist.filter(e => typeFilter==="all"||e.type===typeFilter).map(item => (
-              <div key={item.id} style={{ display:"flex", flexDirection:"column", gap:9, cursor:"pointer" }}>
-                <Poster entry={item} size="lg" />
+              <div key={item.id} style={{ display:"flex", flexDirection:"column", gap:9 }}>
+                <div style={{ position:"relative" }}>
+                  <Poster entry={item} size="lg" />
+                  <button
+                    onClick={() => handleRemoveFromWatchlist(item.id)}
+                    title="Remove from watchlist"
+                    style={{ position:"absolute", top:4, right:4, width:20, height:20, borderRadius:"50%", background:"rgba(30,26,20,0.65)", border:"none", color:"white", fontSize:13, lineHeight:1, cursor:"pointer", display:"flex", alignItems:"center", justifyContent:"center", fontFamily:"'Lato', sans-serif" }}>
+                    ×
+                  </button>
+                </div>
                 <div>
                   <TypeBadge type={item.type} />
                   <div style={{ fontSize:12, fontWeight:700, color:"var(--ink)", lineHeight:1.35, marginTop:4 }}>{item.title}</div>
@@ -458,8 +478,8 @@ export default function WatchingPage() {
         )}
       </div>
 
-      {showLog && <LogModal onClose={() => setShowLog(false)} onSaved={() => loadEntries()} />}
-      {showWatchlist && <WatchlistModal onClose={() => setShowWatchlist(false)} onSaved={() => loadEntries()} />}
+      {showLog && <LogModal onClose={() => setShowLog(false)} onSaved={() => loadEntries()} watchlistEntries={watchlist} />}
+      {showWatchlist && <WatchlistModal onClose={() => setShowWatchlist(false)} onSaved={() => loadEntries()} watchlistIds={watchlistIds} />}
     </div>
   );
 }

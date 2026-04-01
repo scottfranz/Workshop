@@ -6,6 +6,7 @@ interface CoffeeProduct {
   title: string; price: number | null; available: boolean;
   url: string; image: string | null; roaster: string;
   roasterColor: string; type: "roasted" | "green";
+  published_at?: string;
 }
 
 interface Roaster {
@@ -70,14 +71,20 @@ export default function DiscoverPage() {
     setDeletingRoaster(null);
   }
 
-  const filtered = products.filter(c => {
-    if (!c.available) return false;
-    const key = `${c.roaster}::${c.title}`;
-    if (hidden.has(key)) return false;
-    if (roasterFilter !== "All" && c.roaster !== roasterFilter) return false;
-    if (search && !c.title.toLowerCase().includes(search.toLowerCase()) && !c.roaster.toLowerCase().includes(search.toLowerCase())) return false;
-    return true;
-  });
+  const filtered = products
+    .filter(c => {
+      if (!c.available) return false;
+      const key = `${c.roaster}::${c.title}`;
+      if (hidden.has(key)) return false;
+      if (roasterFilter !== "All" && c.roaster !== roasterFilter) return false;
+      if (search && !c.title.toLowerCase().includes(search.toLowerCase()) && !c.roaster.toLowerCase().includes(search.toLowerCase())) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const da = a.published_at ? new Date(a.published_at).getTime() : 0;
+      const db = b.published_at ? new Date(b.published_at).getTime() : 0;
+      return db - da;
+    });
 
 
 
