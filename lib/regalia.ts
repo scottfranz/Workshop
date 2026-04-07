@@ -192,7 +192,8 @@ export interface TandemEntry {
   origin: string | null;
 }
 
-const TANDEM_URL = "https://www.tandemcoffee.com/products/tandem-sampler";
+// Use Shopify's product JSON endpoint — reliable, no HTML parsing, no JS rendering issues
+const TANDEM_JSON_URL = "https://www.tandemcoffee.com/products/tandem-sampler.json";
 
 export async function fetchTandemSampler(): Promise<{
   entries: TandemEntry[];
@@ -201,31 +202,38 @@ export async function fetchTandemSampler(): Promise<{
 }> {
   const fetchedAt = new Date().toISOString();
   try {
-    const res = await fetch(TANDEM_URL, {
+    const res = await fetch(TANDEM_JSON_URL, {
       headers: { "User-Agent": "Mozilla/5.0" },
       signal: AbortSignal.timeout(12000),
     });
     if (!res.ok) return { entries: [], fetchedAt, error: `HTTP ${res.status}` };
 
-    const html = await res.text();
+    const json = await res.json();
+    const body: string = json?.product?.body_html ?? "";
+    if (!body) return { entries: [], fetchedAt, error: "No product body found in JSON response" };
 
-    // Find the section after "Today's sampler includes"
-    const marker = "Today's sampler includes";
-    const idx = html.indexOf(marker);
-    if (idx === -1) return { entries: [], fetchedAt, error: "Could not find sampler section on page" };
+    // Strip HTML tags and normalise whitespace
+    const text = body
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&amp;/g, "&")
+      .replace(/&nbsp;/g, " ")
+      .replace(/\s+/g, " ");
 
-    // Grab the next 1500 chars and strip tags
-    const chunk = html.slice(idx, idx + 1500);
-    const text = chunk.replace(/<[^>]+>/g, " ").replace(/&amp;/g, "&").replace(/\s+/g, " ");
-
-    // Match lines like: "Faver Ninco Gesha (Huila, Colombia)"
+    // Match coffee entries like "Faver Ninco Gesha (Huila, Colombia)"
+    // The body_html uses <strong> tags for each coffee name, but after stripping we
+    // can rely on the "(origin)" pattern that Tandem consistently uses.
     const matches = Array.from(text.matchAll(/([A-Z][^()]{3,60}?)\s*\(([^)]+)\)/g));
+
+    const NOISE_WORDS = ["sampler", "typography", "font", "today", "following", "order", "bag", "bean"];
 
     const entries: TandemEntry[] = matches
       .map(m => ({ name: m[1].trim(), origin: m[2].trim() }))
-      .filter(e => e.name.length > 3 && !e.name.toLowerCase().includes("sampler") && !e.name.toLowerCase().includes("typography") && !e.name.toLowerCase().includes("font"));
+      .filter(e =>
+        e.name.length > 3 &&
+        !NOISE_WORDS.some(w => e.name.toLowerCase().includes(w))
+      );
 
-    if (entries.length === 0) return { entries: [], fetchedAt, error: "No coffees found in sampler section" };
+    if (entries.length === 0) return { entries: [], fetchedAt, error: "No coffees found in sampler body_html" };
 
     return { entries, fetchedAt, error: null };
   } catch (err) {
