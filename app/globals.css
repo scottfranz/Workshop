@@ -1,0 +1,32 @@
+@import url('https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --cream: #F5F0E8;
+  --warm-white: #FAF8F3;
+  --ink: #1E1A14;
+  --ink-light: #4A4438;
+  --ink-faint: #8C8070;
+  --coffee: #6B4226;
+  --coffee-light: #C4956A;
+  --sage: #7A9E7E;
+  --sage-light: #B8D4BB;
+  --slate: #5B7FA6;
+  --slate-light: #C2D4E8;
+  --gold: #C9963A;
+  --gold-light: #F0D9A8;
+  --terracotta: #B5622A;
+  --terracotta-light: #E8C4A0;
+  --border: #DDD5C8;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  background: var(--cream);
+  font-family: 'Lato', sans-serif;
+  color: var(--ink);
+}
