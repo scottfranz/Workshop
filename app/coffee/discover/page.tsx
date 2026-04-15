@@ -24,7 +24,6 @@ export default function DiscoverPage() {
   const [search, setSearch] = useState("");
   const [view, setView] = useState<"grid" | "list">("grid");
   const [showAddModal, setShowAddModal] = useState(false);
-  const [addedToLog, setAddedToLog] = useState(new Set<string>());
   const [deletingRoaster, setDeletingRoaster] = useState<string | null>(null);
 
   const fetchProducts = useCallback(async (bust = false) => {
@@ -112,7 +111,7 @@ export default function DiscoverPage() {
         </div>
       </div>
 
-      <div style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", background: "var(--cream)", display: "flex", gap: 6, alignItems: "center", flexWrap: "nowrap", flexShrink: 0, overflowX: "auto", WebkitOverflowScrolling: "touch" as React.CSSProperties["WebkitOverflowScrolling"] }}>
+      <div className="roaster-strip" style={{ padding: "8px 16px", borderBottom: "1px solid var(--border)", background: "var(--cream)", display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap", flexShrink: 0 }}>
         {roasters.map(r => (
           <div key={r.name} style={{ display: "flex", alignItems: "center", borderRadius: 20, border: `1px solid ${roasterFilter === r.name ? "var(--coffee)" : "var(--border)"}`, background: roasterFilter === r.name ? "var(--coffee)" : "var(--warm-white)", overflow: "hidden" }}>
             <button onClick={() => setRoasterFilter(roasterFilter === r.name ? "All" : r.name)}
@@ -138,6 +137,9 @@ export default function DiscoverPage() {
             .discover-topbar { padding: 24px 48px !important; }
             .discover-grid { grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)) !important; }
           }
+          @media (max-width: 768px) {
+            .roaster-strip { display: none !important; }
+          }
         `}</style>
         {loading ? (
           <div style={{ textAlign: "center", padding: "60px 0", color: "var(--ink-faint)" }}>Loading…</div>
@@ -148,8 +150,8 @@ export default function DiscoverPage() {
         ) : (
           <div className="discover-grid" style={view === "grid" ? { display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 } : {}}>
             {filtered.map(c => view === "grid"
-              ? <GridCard key={c.title + c.roaster} coffee={c} added={addedToLog.has(c.title)} onAdd={() => setAddedToLog(p => new Set(Array.from(p).concat(c.title)))} onHide={() => handleHide(c)} />
-              : <ListRow key={c.title + c.roaster} coffee={c} added={addedToLog.has(c.title)} onAdd={() => setAddedToLog(p => new Set(Array.from(p).concat(c.title)))} onHide={() => handleHide(c)} />
+              ? <GridCard key={c.url} coffee={c} onHide={() => handleHide(c)} />
+              : <ListRow key={c.url} coffee={c} onHide={() => handleHide(c)} />
             )}
           </div>
         )}
@@ -160,7 +162,7 @@ export default function DiscoverPage() {
   );
 }
 
-function GridCard({ coffee, added, onAdd, onHide }: { coffee: CoffeeProduct; added: boolean; onAdd: () => void; onHide: () => void }) {
+function GridCard({ coffee, onHide }: { coffee: CoffeeProduct; onHide: () => void }) {
   const color = coffee.roasterColor;
   return (
     <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden", background: "var(--warm-white)", display: "flex", flexDirection: "column", position: "relative" }}>
@@ -168,38 +170,30 @@ function GridCard({ coffee, added, onAdd, onHide }: { coffee: CoffeeProduct; add
         style={{ position: "absolute", top: 6, right: 6, zIndex: 2, width: 22, height: 22, borderRadius: "50%", background: "rgba(30,26,20,0.55)", border: "none", color: "white", fontSize: 15, lineHeight: 1, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Lato', sans-serif" }}>
         ×
       </button>
-      <div style={{ width: "100%", aspectRatio: "4/5", background: color + "18", position: "relative", overflow: "hidden" }}>
+      <a href={coffee.url} target="_blank" rel="noreferrer" style={{ display: "block", width: "100%", aspectRatio: "4/5", background: color + "18", position: "relative", overflow: "hidden" }}>
         {coffee.image ? <img src={coffee.image} alt={coffee.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BagPlaceholder color={color} />}
-        {coffee.type === "green" && <div style={{ position: "absolute", top: 8, left: 8, background: "var(--sage)", color: "white", fontSize: 9, fontWeight: 700, padding: "3px 7px", borderRadius: 3 }}>Green</div>}        <div style={{ position: "absolute", bottom: 8, left: 8 }}>
+        {coffee.type === "green" && <div style={{ position: "absolute", top: 8, left: 8, background: "var(--sage)", color: "white", fontSize: 9, fontWeight: 700, padding: "3px 7px", borderRadius: 3 }}>Green</div>}
+        <div style={{ position: "absolute", bottom: 8, left: 8 }}>
           <span style={{ fontSize: 10, fontWeight: 700, background: color + "dd", color: "white", padding: "2px 7px", borderRadius: 3 }}>{coffee.roaster}</span>
         </div>
-      </div>
+      </a>
       <div style={{ padding: "12px 14px", flex: 1, display: "flex", flexDirection: "column", gap: 5 }}>
         <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 13, fontWeight: 600, lineHeight: 1.3 }}>{coffee.title}</div>
-        <div style={{ flex: 1 }} />
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 6 }}>
-          <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600, color: "var(--coffee)" }}>
-            {coffee.price ? `$${coffee.price.toFixed(2)}` : "—"}
-          </div>
-          <div style={{ display: "flex", gap: 6 }}>
-            <button onClick={onAdd} style={{ padding: "4px 9px", fontSize: 11, border: `1px solid ${added ? "var(--sage)" : "var(--border)"}`, borderRadius: 4, background: added ? "rgba(122,158,126,0.1)" : "transparent", color: added ? "var(--sage)" : "var(--ink-faint)", cursor: added ? "default" : "pointer", fontFamily: "'Lato', sans-serif" }}>
-              {added ? "✓" : "+ Log"}
-            </button>
-            <a href={coffee.url} target="_blank" rel="noreferrer" style={{ padding: "4px 9px", fontSize: 11, border: "1px solid var(--border)", borderRadius: 4, color: "var(--ink-faint)", textDecoration: "none", fontFamily: "'Lato', sans-serif" }}>Buy →</a>
-          </div>
+        <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600, color: "var(--coffee)", marginTop: 4 }}>
+          {coffee.price ? `$${coffee.price.toFixed(2)}` : "—"}
         </div>
       </div>
     </div>
   );
 }
 
-function ListRow({ coffee, added, onAdd, onHide }: { coffee: CoffeeProduct; added: boolean; onAdd: () => void; onHide: () => void }) {
+function ListRow({ coffee, onHide }: { coffee: CoffeeProduct; onHide: () => void }) {
   const color = coffee.roasterColor;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 14, padding: "12px 0", borderBottom: "1px solid var(--border)" }}>
-      <div style={{ width: 40, height: 52, borderRadius: 4, flexShrink: 0, overflow: "hidden", background: color + "18" }}>
+      <a href={coffee.url} target="_blank" rel="noreferrer" style={{ width: 40, height: 52, borderRadius: 4, flexShrink: 0, overflow: "hidden", background: color + "18", display: "block" }}>
         {coffee.image ? <img src={coffee.image} alt={coffee.title} style={{ width: "100%", height: "100%", objectFit: "cover" }} /> : <BagPlaceholder color={color} />}
-      </div>
+      </a>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <span style={{ fontFamily: "'Playfair Display', serif", fontSize: 14, fontWeight: 600 }}>{coffee.title}</span>
@@ -210,10 +204,6 @@ function ListRow({ coffee, added, onAdd, onHide }: { coffee: CoffeeProduct; adde
       </div>
       <div style={{ display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
         <div style={{ fontFamily: "'Playfair Display', serif", fontSize: 15, fontWeight: 600, color: "var(--coffee)" }}>{coffee.price ? `$${coffee.price.toFixed(2)}` : "—"}</div>
-        <button onClick={onAdd} style={{ padding: "5px 10px", fontSize: 12, border: `1px solid ${added ? "var(--sage)" : "var(--border)"}`, borderRadius: 4, background: added ? "rgba(122,158,126,0.1)" : "transparent", color: added ? "var(--sage)" : "var(--ink-faint)", cursor: added ? "default" : "pointer", fontFamily: "'Lato', sans-serif" }}>
-          {added ? "✓ Logged" : "+ Log"}
-        </button>
-        <a href={coffee.url} target="_blank" rel="noreferrer" style={{ padding: "5px 10px", fontSize: 12, border: "1px solid var(--border)", borderRadius: 4, color: "var(--ink-faint)", textDecoration: "none", fontFamily: "'Lato', sans-serif" }}>Buy →</a>
         <button onClick={onHide} title="Hide" style={{ padding: "5px 8px", fontSize: 14, border: "1px solid var(--border)", borderRadius: 4, color: "var(--ink-faint)", background: "transparent", cursor: "pointer", fontFamily: "'Lato', sans-serif" }}>×</button>
       </div>
     </div>
