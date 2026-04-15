@@ -113,6 +113,7 @@ function nameToHandle(name: string): string {
 export async function fetchRegaliaSchedule(): Promise<{
   entries: RegaliaEntry[];
   fetchedAt: string;
+  shopifyUpdatedAt: string | null;
   error: string | null;
 }> {
   const fetchedAt = new Date().toISOString();
@@ -124,18 +125,19 @@ export async function fetchRegaliaSchedule(): Promise<{
     });
 
     if (!res.ok) {
-      return { entries: [], fetchedAt, error: `HTTP ${res.status}` };
+      return { entries: [], fetchedAt, shopifyUpdatedAt: null, error: `HTTP ${res.status}` };
     }
 
     const json = await res.json();
     const html: string = json?.product?.body_html ?? "";
+    const shopifyUpdatedAt: string | null = json?.product?.updated_at ?? null;
     if (!html) {
-      return { entries: [], fetchedAt, error: "No product body found in JSON response" };
+      return { entries: [], fetchedAt, shopifyUpdatedAt, error: "No product body found in JSON response" };
     }
     const lines = extractScheduleLines(html);
 
     if (lines.length === 0) {
-      return { entries: [], fetchedAt, error: "No schedule found on page — layout may have changed" };
+      return { entries: [], fetchedAt, shopifyUpdatedAt, error: "No schedule found on page — layout may have changed" };
     }
 
     const currentYear = new Date().getFullYear();
@@ -156,9 +158,9 @@ export async function fetchRegaliaSchedule(): Promise<{
       entries.push(entry);
     }
 
-    return { entries, fetchedAt, error: null };
+    return { entries, fetchedAt, shopifyUpdatedAt, error: null };
   } catch (err) {
-    return { entries: [], fetchedAt, error: String(err) };
+    return { entries: [], fetchedAt, shopifyUpdatedAt: null, error: String(err) };
   }
 }
 
@@ -244,4 +246,69 @@ export async function fetchTandemSampler(): Promise<{
 export function tandemSamplersAreDifferent(a: TandemEntry[], b: TandemEntry[]): boolean {
   if (a.length !== b.length) return true;
   return a.some((entry, i) => entry.name !== b[i]?.name);
+}
+
+// ─── Showroom Coffee Green Coffee Scraper ────────────────────────────────────
+
+export interface ShowroomEntry {
+  name: string;
+  slug: string;
+  url: string;
+}
+
+const SHOWROOM_BASE = "https://showroomcoffee.com/category/green-coffee";
+
+function parseShowroomPage(html: string): ShowroomEntry[] {
+  const entries: ShowroomEntry[] = [];
+  // WooCommerce product cards have <a href="https://showroomcoffee.com/product/SLUG/" ...>NAME</a>
+  const productRegex = /<a\s+href="(https:\/\/showroomcoffee\.com\/product\/([^/"]+)\/)"/g;
+  let match;
+  while ((match = productRegex.exec(html)) !== null) {
+    const [, url, slug] = match;
+    if (entries.some(e => e.slug === slug)) continue;
+    // Extract name from the nearby <h3> or title attribute if present
+    const titleMatch = html.slice(match.index, match.index + 400).match(/title="([^"]+)"/);
+    const name = titleMatch ? titleMatch[1] : slug.replace(/-/g, " ");
+    entries.push({ name, slug, url });
+  }
+  return entries;
+}
+
+export async function fetchShowroomGreenCoffee(): Promise<{
+  entries: ShowroomEntry[];
+  error: string | null;
+}> {
+  try {
+    const allEntries: ShowroomEntry[] = [];
+    for (let page = 1; page <= 5; page++) {
+      const url = page === 1
+        ? `${SHOWROOM_BASE}/`
+        : `${SHOWROOM_BASE}/page/${page}/`;
+      const res = await fetch(url, {
+        headers: { "User-Agent": "Mozilla/5.0" },
+        signal: AbortSignal.timeout(12000),
+      });
+      if (!res.ok) {
+        if (page === 1) return { entries: [], error: `HTTP ${res.status}` };
+        break; // No more pages
+      }
+      const html = await res.text();
+      const pageEntries = parseShowroomPage(html);
+      if (pageEntries.length === 0) break;
+      for (const entry of pageEntries) {
+        if (!allEntries.some(e => e.slug === entry.slug)) {
+          allEntries.push(entry);
+        }
+      }
+    }
+    return { entries: allEntries, error: null };
+  } catch (err) {
+    return { entries: [], error: String(err) };
+  }
+}
+
+// Returns only slugs that are in `fresh` but not in `stored` (new additions only)
+export function showroomNewProducts(stored: ShowroomEntry[], fresh: ShowroomEntry[]): ShowroomEntry[] {
+  const storedSlugs = new Set(stored.map(e => e.slug));
+  return fresh.filter(e => !storedSlugs.has(e.slug));
 }

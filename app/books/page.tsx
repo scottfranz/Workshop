@@ -39,7 +39,7 @@ function groupByMonth(books: Book[]) {
     if (!groups[key]) groups[key] = [];
     groups[key].push(book);
   }
-  return Object.entries(groups);
+  return Object.entries(groups).sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime());
 }
 
 export default function BooksPage() {
