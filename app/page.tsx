@@ -2,11 +2,18 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
+
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 interface CoffeeStats { totalBags: number; avgRating: number; topRated: { name: string; roaster: string; rating: number }[]; recentBags: { name: string; roaster: string; openDate: string; rating: number | null }[]; }
 interface BookItem { title: string; author: string; shelf: string; rating?: number | null; dateRead?: string | null; }
 interface WatchItem { id: string; title: string; type: string; year: number; rating: number; date_watched: string; watchlist: boolean; }
 interface WritingItem { id: string; title: string; type: string; word_count: number; created_at: string; }
+interface PodcastEpisode { id: number; episode_title: string; show_name: string; artwork_url: string | null; rating: number | null; listened_at: string; }
 
 export default function HomePage() {
   const hour = new Date().getHours();
@@ -16,12 +23,19 @@ export default function HomePage() {
   const [books, setBooks] = useState<BookItem[]>([]);
   const [watches, setWatches] = useState<WatchItem[]>([]);
   const [writings, setWritings] = useState<WritingItem[]>([]);
+  const [podcasts, setPodcasts] = useState<PodcastEpisode[]>([]);
 
   useEffect(() => {
     fetch("/api/coffee-stats").then(r => r.json()).then(d => { if (!d.error) setCoffeeStats(d); }).catch(() => {});
     fetch("/api/books").then(r => r.json()).then(d => { if (Array.isArray(d)) setBooks(d); }).catch(() => {});
     fetch("/api/movies").then(r => r.json()).then(d => { if (Array.isArray(d)) setWatches(d); }).catch(() => {});
     fetch("/api/writing").then(r => r.json()).then(d => { if (Array.isArray(d)) setWritings(d); }).catch(() => {});
+    supabase
+      .from("podcast_episodes")
+      .select("id, episode_title, show_name, artwork_url, rating, listened_at")
+      .order("listened_at", { ascending: false })
+      .limit(10)
+      .then(({ data }) => { if (data) setPodcasts(data); });
   }, []);
 
   const watched = watches.filter(w => !w.watchlist);
@@ -29,13 +43,20 @@ export default function HomePage() {
   const currentlyReading = books.filter(b => b.shelf === "currently-reading");
   const booksReadThisYear = books.filter(b => b.shelf === "read" && b.dateRead?.startsWith(String(currentYear)));
   const recentWatches = watched.slice(0, 2);
-  const recentWriting = writings.slice(0, 1);
+  const recentWriting = writings.slice(0, 2);
+  const recentPodcasts = podcasts.slice(0, 2);
+  const ratedPodcasts = podcasts.filter(p => p.rating);
+  const podcastAvgRating = ratedPodcasts.length > 0
+    ? (ratedPodcasts.reduce((s, p) => s + (p.rating ?? 0), 0) / ratedPodcasts.length).toFixed(1)
+    : null;
+  const podcastShows = Array.from(new Set(podcasts.map(p => p.show_name)));
 
   const summaryCards = [
     { label: "Coffees Logged", value: coffeeStats ? String(coffeeStats.totalBags) : "—", detail: coffeeStats ? `avg rating ${coffeeStats.avgRating ?? ""}` : "loading…", color: "var(--coffee)", href: "/coffee" },
     { label: "Currently Reading", value: currentlyReading.length || "0", detail: `${booksReadThisYear.length} read this year`, color: "var(--slate)", href: "/books" },
     { label: "Films & Shows", value: watched.length || "—", detail: recentWatches[0] ? `Last: ${recentWatches[0].title}` : "nothing logged yet", color: "var(--gold)", href: "/watching" },
     { label: "Writing Entries", value: writings.length || "—", detail: recentWriting[0] ? `Last: ${recentWriting[0].title}` : "nothing yet", color: "var(--terracotta)", href: "/writing" },
+    { label: "Episodes Logged", value: podcasts.length || "—", detail: podcastAvgRating ? `avg rating ${podcastAvgRating} · ${podcastShows.length} show${podcastShows.length !== 1 ? "s" : ""}` : `${podcastShows.length} show${podcastShows.length !== 1 ? "s" : ""}`, color: "#7B5EA7", href: "/podcasts" },
   ] as const;
 
   const fmtDate = (s: string) => s ? new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
@@ -50,9 +71,12 @@ export default function HomePage() {
 
       <style>{`
         @media (min-width: 769px) {
-          .home-stats { grid-template-columns: repeat(4, 1fr) !important; }
+          .home-stats { grid-template-columns: repeat(3, 1fr) !important; }
           .home-modules { grid-template-columns: repeat(2, 1fr) !important; }
           .home-pad { padding: 40px 48px !important; }
+        }
+        @media (min-width: 1100px) {
+          .home-stats { grid-template-columns: repeat(5, 1fr) !important; }
         }
       `}</style>
       <div className="home-pad" style={{ padding: "20px 16px", maxWidth: 1100 }}>
@@ -107,10 +131,19 @@ export default function HomePage() {
           </ModuleCard>
 
           {/* Writing */}
-          <ModuleCard href="/writing" icon="✍︎" name="Writing" tagline="Journal · Drafts · Notes" accent="rgba(181,98,42,0.1)" recentLabel="Latest Entry">
+          <ModuleCard href="/writing" icon="✍︎" name="Writing" tagline="Journal · Drafts · Notes" accent="rgba(181,98,42,0.1)" recentLabel="Latest Entries">
             {recentWriting.length > 0
               ? recentWriting.map((w, i) => <Item key={i} title={w.title} sub={`${w.word_count} words · ${w.type}`} right="" date={fmtDate(w.created_at)} />)
               : <Item title="Nothing yet" sub="" right="" date="" />}
+          </ModuleCard>
+
+          {/* Podcasts */}
+          <ModuleCard href="/podcasts" icon="🎙️" name="Podcasts" tagline="Episode log · Show ratings" accent="rgba(123,94,167,0.1)" recentLabel="Recently Listened">
+            {recentPodcasts.length > 0
+              ? recentPodcasts.map((p, i) => (
+                  <Item key={i} title={p.episode_title} sub={p.show_name} right={p.rating ? `${p.rating}/10` : ""} date={fmtDate(p.listened_at)} />
+                ))
+              : <Item title="Nothing logged yet" sub="" right="" date="" />}
           </ModuleCard>
 
           {/* Projects placeholder */}
