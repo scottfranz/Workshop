@@ -14,6 +14,7 @@ const NAV = [
   { href: "/books", label: "Reading", dot: "#5B7FA6" },
   { href: "/watching", label: "Movies & TV", dot: "#C9963A" },
   { href: "/writing", label: "Writing", dot: "#B5622A" },
+  { href: "/podcasts", label: "Podcasts", dot: "#7B5EA7" },
   { section: "Other" },
   { href: "/projects", label: "Projects", dot: "#8C8070" },
 ];
@@ -29,6 +30,7 @@ const TABS = [
   { href: "/books", label: "Reading", icon: "📖", children: null },
   { href: "/watching", label: "Movies", icon: "🎬", children: null },
   { href: "/writing", label: "Writing", icon: "✍︎", children: null },
+  { href: "/podcasts", label: "Podcasts", icon: "🎙️", children: null },
   { href: "/projects", label: "Projects", icon: "◈", children: null },
 ];
 
@@ -75,6 +77,10 @@ export default function Sidebar() {
       </aside>
 
       {/* Mobile bottom tab bar */}
+      <style>{`
+        .mobile-tab-scroll::-webkit-scrollbar { display: none; }
+        .mobile-tab-scroll { -ms-overflow-style: none; scrollbar-width: none; }
+      `}</style>
       <nav className="mobile-tabs" style={{ display: "none", position: "fixed", bottom: 0, left: 0, right: 0, background: "var(--ink)", borderTop: "1px solid rgba(255,255,255,0.1)", zIndex: 100, paddingBottom: "env(safe-area-inset-bottom)" }}>
         {/* Submenu popup */}
         {openMenu && (() => {
@@ -95,21 +101,39 @@ export default function Sidebar() {
             </>
           );
         })()}
-        <div style={{ display: "flex", justifyContent: "space-around", alignItems: "center", height: 56 }}>
+
+        {/* Scrollable tab row */}
+        <div
+          className="mobile-tab-scroll"
+          style={{ display: "flex", alignItems: "center", height: 56, overflowX: "auto", paddingLeft: 4, paddingRight: 4 }}
+        >
           {TABS.map(tab => {
             const active = tab.href === "/" ? pathname === "/" : pathname.startsWith(tab.href);
+            const tabStyle: React.CSSProperties = {
+              flexShrink: 0,
+              minWidth: 64,
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 2,
+              padding: "6px 8px",
+              color: active ? "var(--coffee-light)" : "rgba(245,240,232,0.45)",
+              transition: "color 0.15s",
+              textDecoration: "none",
+            };
+
             return tab.children ? (
-              <button key={tab.href} onClick={() => setOpenMenu(openMenu === tab.href ? null : tab.href)}
-                style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "6px 0", color: active ? "var(--coffee-light)" : "rgba(245,240,232,0.45)", transition: "color 0.15s" }}>
+              <button key={tab.href} onClick={() => setOpenMenu(openMenu === tab.href ? null : tab.href)} style={tabStyle}>
                 <span style={{ fontSize: 18, lineHeight: 1 }}>{tab.icon}</span>
                 <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", fontFamily: "'Lato', sans-serif" }}>{tab.label}</span>
               </button>
             ) : (
-              <Link key={tab.href} href={tab.href} style={{ textDecoration: "none", flex: 1 }} onClick={() => setOpenMenu(null)}>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: "6px 0", color: active ? "var(--coffee-light)" : "rgba(245,240,232,0.45)", transition: "color 0.15s" }}>
-                  <span style={{ fontSize: 18, lineHeight: 1 }}>{tab.icon}</span>
-                  <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", fontFamily: "'Lato', sans-serif" }}>{tab.label}</span>
-                </div>
+              <Link key={tab.href} href={tab.href} style={tabStyle} onClick={() => setOpenMenu(null)}>
+                <span style={{ fontSize: 18, lineHeight: 1 }}>{tab.icon}</span>
+                <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", fontFamily: "'Lato', sans-serif" }}>{tab.label}</span>
               </Link>
             );
           })}
