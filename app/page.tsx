@@ -13,7 +13,7 @@ interface CoffeeStats { totalBags: number; avgRating: number; topRated: { name: 
 interface BookItem { title: string; author: string; shelf: string; rating?: number | null; dateRead?: string | null; }
 interface WatchItem { id: string; title: string; type: string; year: number; rating: number; date_watched: string; watchlist: boolean; }
 interface WritingItem { id: string; title: string; type: string; word_count: number; created_at: string; }
-interface PodcastEpisode { id: number; episode_title: string; show_name: string; artwork_url: string | null; rating: number | null; listened_at: string; }
+interface PodcastItem { id: string; episode_title: string; show_name: string; artwork_url: string; rating: number; listened_at: string; }
 
 export default function HomePage() {
   const hour = new Date().getHours();
@@ -23,19 +23,45 @@ export default function HomePage() {
   const [books, setBooks] = useState<BookItem[]>([]);
   const [watches, setWatches] = useState<WatchItem[]>([]);
   const [writings, setWritings] = useState<WritingItem[]>([]);
-  const [podcasts, setPodcasts] = useState<PodcastEpisode[]>([]);
+  const [podcasts, setPodcasts] = useState<PodcastItem[]>([]);
+  const [podcastCount, setPodcastCount] = useState<number>(0);
+  const [podcastShows, setPodcastShows] = useState<number>(0);
+  const [podcastAvgRating, setPodcastAvgRating] = useState<number | null>(null);
 
   useEffect(() => {
     fetch("/api/coffee-stats").then(r => r.json()).then(d => { if (!d.error) setCoffeeStats(d); }).catch(() => {});
     fetch("/api/books").then(r => r.json()).then(d => { if (Array.isArray(d)) setBooks(d); }).catch(() => {});
     fetch("/api/movies").then(r => r.json()).then(d => { if (Array.isArray(d)) setWatches(d); }).catch(() => {});
     fetch("/api/writing").then(r => r.json()).then(d => { if (Array.isArray(d)) setWritings(d); }).catch(() => {});
+
+    // Display: just the 2 most recent episodes
     supabase
       .from("podcast_episodes")
       .select("id, episode_title, show_name, artwork_url, rating, listened_at")
       .order("listened_at", { ascending: false })
-      .limit(10)
+      .limit(2)
       .then(({ data }) => { if (data) setPodcasts(data); });
+
+    // Count: separate head-only query, no row limit
+    supabase
+      .from("podcast_episodes")
+      .select("*", { count: "exact", head: true })
+      .then(({ count }) => { if (count !== null) setPodcastCount(count); });
+
+    // Shows + avg rating: fetch just the fields we need across all episodes
+    supabase
+      .from("podcast_episodes")
+      .select("show_name, rating")
+      .then(({ data }) => {
+        if (data) {
+          setPodcastShows(Array.from(new Set(data.map(d => d.show_name))).length);
+          const rated = data.filter(d => d.rating);
+          if (rated.length > 0) {
+            const avg = rated.reduce((sum, d) => sum + d.rating, 0) / rated.length;
+            setPodcastAvgRating(Math.round(avg * 10) / 10);
+          }
+        }
+      });
   }, []);
 
   const watched = watches.filter(w => !w.watchlist);
@@ -43,20 +69,13 @@ export default function HomePage() {
   const currentlyReading = books.filter(b => b.shelf === "currently-reading");
   const booksReadThisYear = books.filter(b => b.shelf === "read" && b.dateRead?.startsWith(String(currentYear)));
   const recentWatches = watched.slice(0, 2);
-  const recentWriting = writings.slice(0, 2);
-  const recentPodcasts = podcasts.slice(0, 2);
-  const ratedPodcasts = podcasts.filter(p => p.rating);
-  const podcastAvgRating = ratedPodcasts.length > 0
-    ? (ratedPodcasts.reduce((s, p) => s + (p.rating ?? 0), 0) / ratedPodcasts.length).toFixed(1)
-    : null;
-  const podcastShows = Array.from(new Set(podcasts.map(p => p.show_name)));
-
+  const recentWriting = writings.slice(0, 1);
   const summaryCards = [
     { label: "Coffees Logged", value: coffeeStats ? String(coffeeStats.totalBags) : "—", detail: coffeeStats ? `avg rating ${coffeeStats.avgRating ?? ""}` : "loading…", color: "var(--coffee)", href: "/coffee" },
     { label: "Currently Reading", value: currentlyReading.length || "0", detail: `${booksReadThisYear.length} read this year`, color: "var(--slate)", href: "/books" },
     { label: "Films & Shows", value: watched.length || "—", detail: recentWatches[0] ? `Last: ${recentWatches[0].title}` : "nothing logged yet", color: "var(--gold)", href: "/watching" },
     { label: "Writing Entries", value: writings.length || "—", detail: recentWriting[0] ? `Last: ${recentWriting[0].title}` : "nothing yet", color: "var(--terracotta)", href: "/writing" },
-    { label: "Episodes Logged", value: podcasts.length || "—", detail: podcastAvgRating ? `avg rating ${podcastAvgRating} · ${podcastShows.length} show${podcastShows.length !== 1 ? "s" : ""}` : `${podcastShows.length} show${podcastShows.length !== 1 ? "s" : ""}`, color: "#7B5EA7", href: "/podcasts" },
+    { label: "Episodes Logged", value: podcastCount || "—", detail: podcastAvgRating !== null ? `avg ${podcastAvgRating} · ${podcastShows} show${podcastShows !== 1 ? "s" : ""}` : "loading…", color: "#7B5EA7", href: "/podcasts" },
   ] as const;
 
   const fmtDate = (s: string) => s ? new Date(s).toLocaleDateString("en-US", { month: "short", day: "numeric" }) : "";
@@ -131,18 +150,16 @@ export default function HomePage() {
           </ModuleCard>
 
           {/* Writing */}
-          <ModuleCard href="/writing" icon="✍︎" name="Writing" tagline="Journal · Drafts · Notes" accent="rgba(181,98,42,0.1)" recentLabel="Latest Entries">
+          <ModuleCard href="/writing" icon="✍︎" name="Writing" tagline="Journal · Drafts · Notes" accent="rgba(181,98,42,0.1)" recentLabel="Latest Entry">
             {recentWriting.length > 0
               ? recentWriting.map((w, i) => <Item key={i} title={w.title} sub={`${w.word_count} words · ${w.type}`} right="" date={fmtDate(w.created_at)} />)
               : <Item title="Nothing yet" sub="" right="" date="" />}
           </ModuleCard>
 
           {/* Podcasts */}
-          <ModuleCard href="/podcasts" icon="🎙️" name="Podcasts" tagline="Episode log · Show ratings" accent="rgba(123,94,167,0.1)" recentLabel="Recently Listened">
-            {recentPodcasts.length > 0
-              ? recentPodcasts.map((p, i) => (
-                  <Item key={i} title={p.episode_title} sub={p.show_name} right={p.rating ? `${p.rating}/10` : ""} date={fmtDate(p.listened_at)} />
-                ))
+          <ModuleCard href="/podcasts" icon="🎙" name="Podcasts" tagline="Episode log · Show tracker" accent="rgba(123,94,167,0.1)" recentLabel="Recently Played">
+            {podcasts.length > 0
+              ? podcasts.map((p, i) => <Item key={i} title={p.episode_title} sub={p.show_name} right={p.rating ? String(p.rating) : ""} date={fmtDate(p.listened_at)} />)
               : <Item title="Nothing logged yet" sub="" right="" date="" />}
           </ModuleCard>
 
