@@ -7,65 +7,39 @@ interface Harvest {
 }
 
 const PLANTS_BY_BED: Record<number, string[]> = {
-  1: ["Brussels Sprouts","Broccoli","Cabbage","Kale","Daikon Radish","Rainbow Carrots","Cilantro","Parsley","Chives"],
-  2: ["Snapdragon","California Poppy","Swiss Chard","Rainbow Carrots","Daikon Radish","Cilantro","Parsley","Chives"],
-  3: ["Tomatillo","Cucumber","Jalapeño","Basil","Edamame","Honeynut Squash"],
+  1: ["Kale","Daikon","Carrots","Cilantro","Parsley","Swiss Chard","Chives"],
+  2: ["Tomatillo","Sungold Cherry Tomatoes","Jalapeños","Basil","Edamame","Honeynut Squash"],
 };
 
 const PLANT_EMOJIS: Record<string, string> = {
-  "Brussels Sprouts":"🥦","Broccoli":"🥦","Cabbage":"🥬","Kale":"🥬",
-  "Daikon Radish":"🌿","Rainbow Carrots":"🥕","Cilantro":"🌿","Parsley":"🌿",
-  "Chives":"🌿","Snapdragon":"🌸","California Poppy":"🌼","Swiss Chard":"🥬",
-  "Tomatillo":"🫑","Cucumber":"🥒","Jalapeño":"🌶️","Basil":"🌿",
-  "Edamame":"🫘","Honeynut Squash":"🎃",
+  "Kale":"🥬","Daikon":"🌿","Carrots":"🥕","Cilantro":"🌿","Parsley":"🌿",
+  "Swiss Chard":"🥬","Chives":"🌿","Tomatillo":"🫑","Sungold Cherry Tomatoes":"🍅",
+  "Jalapeños":"🌶️","Basil":"🌿","Edamame":"🫘","Honeynut Squash":"🎃",
 };
 
 const SEEDS = [
-  {name:"Brussels Sprouts",variety:"Catskill",bed:1,type:"brassica",indoorStart:"Mar 10",transplant:"Apr 25",harvest:"Oct",spacing:24,status:"not_started",emoji:"🥦"},
-  {name:"Broccoli",variety:"Waltham 29",bed:1,type:"brassica",indoorStart:"Mar 1",transplant:"Apr 10",harvest:"Jun–Jul",spacing:18,status:"not_started",emoji:"🥦"},
-  {name:"Cabbage",variety:"Copenhagen Market",bed:1,type:"brassica",indoorStart:"Mar 1",transplant:"Apr 10",harvest:"Jul",spacing:18,status:"not_started",emoji:"🥬"},
-  {name:"Kale",variety:"Lacinato",bed:1,type:"brassica",indoorStart:"Mar 10",transplant:"Apr 15",harvest:"Jun–Oct",spacing:14,status:"not_started",emoji:"🥬"},
-  {name:"Daikon Radish",variety:"Daikon",bed:1,type:"root",directSow:"Apr 1",harvest:"May–Jun",spacing:6,status:"not_started",emoji:"🌿"},
-  {name:"Rainbow Carrots",variety:"Rainbow Mix",bed:1,type:"root",directSow:"Apr 1",harvest:"Jun–Jul",spacing:3,status:"not_started",emoji:"🥕"},
-  {name:"Cilantro",variety:"Calypso",bed:1,type:"herb",directSow:"Apr 1",harvest:"May–Jun",spacing:6,status:"not_started",emoji:"🌿"},
-  {name:"Parsley",variety:"Dark Green Flat Leaf",bed:1,type:"herb",indoorStart:"Feb 10",transplant:"Apr 20",harvest:"Jun–Oct",spacing:9,status:"started",emoji:"🌿"},
-  {name:"Chives",variety:"Chives",bed:1,type:"herb",directSow:"Apr 1",harvest:"May–Oct",spacing:6,status:"not_started",emoji:"🌿"},
-  {name:"Snapdragon",variety:"Appleblossom",bed:2,type:"flower",indoorStart:"Feb 15",transplant:"Apr 25",harvest:"Jun–Sep",spacing:9,status:"started",emoji:"🌸"},
-  {name:"California Poppy",variety:"California Poppy",bed:2,type:"flower",directSow:"Mar 25",harvest:"May–Aug",spacing:6,status:"not_started",emoji:"🌼"},
-  {name:"Swiss Chard",variety:"Rainbow",bed:2,type:"green",directSow:"Apr 5",harvest:"Jun–Oct",spacing:12,status:"not_started",emoji:"🥬"},
-  {name:"Rainbow Carrots",variety:"Rainbow Mix",bed:2,type:"root",directSow:"Apr 1",harvest:"Jun–Jul",spacing:3,status:"not_started",emoji:"🥕"},
-  {name:"Daikon Radish",variety:"Daikon",bed:2,type:"root",directSow:"Apr 1",harvest:"May–Jun",spacing:6,status:"not_started",emoji:"🌿"},
-  {name:"Tomatillo",variety:"Rio Grande Verde",bed:3,type:"fruiting",indoorStart:"Feb 10",transplant:"May 15",harvest:"Aug–Sep",spacing:24,status:"started",emoji:"🫑"},
-  {name:"Cucumber",variety:"Muncher",bed:3,type:"fruiting",directSow:"May 15",harvest:"Jul–Sep",spacing:12,status:"not_started",emoji:"🥒"},
-  {name:"Jalapeño",variety:"Tam Mild",bed:3,type:"fruiting",indoorStart:"Feb 5",transplant:"May 15",harvest:"Aug–Sep",spacing:18,status:"started",emoji:"🌶️"},
-  {name:"Basil",variety:"Genovese",bed:3,type:"herb",indoorStart:"Mar 25",transplant:"May 15",harvest:"Jun–Sep",spacing:12,status:"not_started",emoji:"🌿"},
-  {name:"Edamame",variety:"Midori (Bush)",bed:3,type:"legume",directSow:"May 15",harvest:"Aug",spacing:6,status:"not_started",emoji:"🫘"},
-  {name:"Honeynut Squash",variety:"Honeynut",bed:3,type:"fruiting",directSow:"May 15",harvest:"Sep–Oct",spacing:36,status:"not_started",emoji:"🎃"},
+  {name:"Kale",variety:"Lacinato",bed:1,type:"green",directSow:"May 19",harvest:"Jul–Oct",spacing:14,emoji:"🥬"},
+  {name:"Daikon",variety:"Daikon",bed:1,type:"root",directSow:"May 19",harvest:"Aug–Sep",spacing:6,emoji:"🌿"},
+  {name:"Carrots",variety:"Rainbow Mix",bed:1,type:"root",directSow:"May 19",harvest:"Aug–Sep",spacing:3,emoji:"🥕"},
+  {name:"Cilantro",variety:"Calypso",bed:1,type:"herb",directSow:"May 19",harvest:"Jun–Jul",spacing:6,emoji:"🌿"},
+  {name:"Parsley",variety:"Dark Green Flat Leaf",bed:1,type:"herb",directSow:"May 19",harvest:"Jul–Oct",spacing:9,emoji:"🌿"},
+  {name:"Swiss Chard",variety:"Rainbow",bed:1,type:"green",directSow:"May 19",harvest:"Jul–Oct",spacing:12,emoji:"🥬"},
+  {name:"Chives",variety:"Chives",bed:1,type:"herb",directSow:"May 19",harvest:"Jun–Oct",spacing:6,emoji:"🌿"},
+  {name:"Tomatillo",variety:"Rio Grande Verde",bed:2,type:"fruiting",directSow:"May 19",harvest:"Aug–Sep",spacing:24,emoji:"🫑"},
+  {name:"Sungold Cherry Tomatoes",variety:"Sungold",bed:2,type:"fruiting",directSow:"May 19",harvest:"Jul–Sep",spacing:24,emoji:"🍅"},
+  {name:"Jalapeños",variety:"Tam Mild",bed:2,type:"fruiting",directSow:"May 19",harvest:"Aug–Sep",spacing:18,emoji:"🌶️"},
+  {name:"Basil",variety:"Genovese",bed:2,type:"herb",directSow:"May 19",harvest:"Jun–Sep",spacing:12,emoji:"🌿"},
+  {name:"Edamame",variety:"Midori (Bush)",bed:2,type:"legume",directSow:"May 19",harvest:"Aug",spacing:6,emoji:"🫘"},
+  {name:"Honeynut Squash",variety:"Honeynut",bed:2,type:"fruiting",directSow:"May 19",harvest:"Sep–Oct",spacing:36,emoji:"🎃"},
 ];
 
-const BED_COLORS: Record<number,string> = {1:"var(--slate)",2:"var(--sage)",3:"var(--terracotta)"};
-const BED_NAMES: Record<number,string> = {1:"Bed 1 — Brassica (Netted)",2:"Bed 2 — Cool Season",3:"Bed 3 — Warm Season"};
-const TYPE_COLORS: Record<string,string> = {brassica:"#5B7FA6",root:"#8a6b5a",herb:"#7A9E7E",flower:"#c4748a",green:"#6b8a6b",fruiting:"#B5622A",legume:"#8a7a5a"};
+const BED_COLORS: Record<number,string> = {1:"var(--slate)",2:"var(--terracotta)"};
+const BED_NAMES: Record<number,string> = {1:"Bed 1 — Greens & Roots",2:"Bed 2 — Warm Season"};
+const TYPE_COLORS: Record<string,string> = {root:"#8a6b5a",herb:"#7A9E7E",green:"#6b8a6b",fruiting:"#B5622A",legume:"#8a7a5a"};
 const UNITS = ["handful","bunch","heads","lbs","oz","cups","pieces","pods","roots","sprigs"];
 
-const TIMELINE = [
-  {month:"Feb",label:"Start indoors",items:["Jalapeño","Tomatillo","Parsley","Snapdragon"],color:"var(--slate)"},
-  {month:"Mar 1–10",label:"Start indoors",items:["Broccoli","Cabbage","Brussels Sprouts","Kale"],color:"var(--slate)"},
-  {month:"Mar 25",label:"Start indoors",items:["Basil"],color:"var(--slate)"},
-  {month:"Mar 25–Apr 1",label:"Direct sow outdoors",items:["California Poppy","Cilantro (sow 1)"],color:"var(--sage)"},
-  {month:"Apr 1–10",label:"Direct sow outdoors",items:["Rainbow Carrots","Daikon Radish","Swiss Chard","Chives","Cilantro (sow 2)"],color:"var(--sage)"},
-  {month:"Apr 10–15",label:"Transplant outdoors",items:["Broccoli","Cabbage","Kale"],color:"var(--terracotta)"},
-  {month:"Apr 20 ⚠️",label:"Last frost date",items:["Safe to transplant cold-tolerant crops"],color:"var(--gold)"},
-  {month:"Apr 25",label:"Transplant outdoors",items:["Brussels Sprouts","Parsley","Snapdragon"],color:"var(--terracotta)"},
-  {month:"May 15",label:"Transplant warm crops",items:["Jalapeño","Tomatillo","Basil"],color:"var(--terracotta)"},
-  {month:"May 15",label:"Direct sow outdoors",items:["Cucumber","Edamame","Honeynut Squash"],color:"var(--sage)"},
-  {month:"Jun–Jul",label:"First harvests",items:["Radish","Cilantro","Broccoli","Carrots","Swiss Chard"],color:"var(--gold)"},
-  {month:"Aug–Sep",label:"Main harvest",items:["Jalapeño","Tomatillo","Cucumber","Edamame","Basil"],color:"var(--gold)"},
-  {month:"Sep–Oct",label:"Fall harvest",items:["Honeynut Squash","Brussels Sprouts"],color:"var(--gold)"},
-];
-
 export default function GardenPage() {
-  const [tab, setTab] = useState<"beds"|"calendar"|"harvest">("beds");
+  const [tab, setTab] = useState<"beds"|"harvest">("beds");
   const [selectedBed, setSelectedBed] = useState<number|null>(null);
   const [harvests, setHarvests] = useState<Harvest[]>([]);
   const [showLog, setShowLog] = useState(false);
@@ -90,20 +64,35 @@ export default function GardenPage() {
 
   const inp = { padding:"9px 12px", border:"1px solid var(--border)", borderRadius:4, fontSize:13, fontFamily:"'Lato', sans-serif", color:"var(--ink)", background:"var(--warm-white)", outline:"none", width:"100%" };
 
+  // Harvest summary: total per plant
+  const harvestSummary = harvests.reduce<Record<string,{amount:number,unit:string,bed:number,emoji:string}>>((acc, h) => {
+    const key = h.plant;
+    if (!acc[key]) acc[key] = {amount:0,unit:h.unit,bed:h.bed,emoji:PLANT_EMOJIS[h.plant]||"🌿"};
+    acc[key].amount += parseFloat(h.amount) || 0;
+    return acc;
+  }, {});
+
   return (
     <div style={{ display:"flex", flexDirection:"column", height:"100vh" }}>
+      {/* Header */}
       <div style={{ padding:"24px 48px", borderBottom:"1px solid var(--border)", display:"flex", alignItems:"center", justifyContent:"space-between", flexShrink:0 }}>
         <div>
           <div style={{ fontFamily:"'Playfair Display', serif", fontSize:26 }}>Garden</div>
-          <div style={{ fontSize:13, color:"var(--ink-faint)", fontWeight:300 }}>3 beds · Zone 6a · Ann Arbor, MI · Last frost ~Apr 20</div>
+          <div style={{ fontSize:13, color:"var(--ink-faint)", fontWeight:300 }}>2 beds · Zone 6a · Garden City, MI · Direct sown May 19</div>
         </div>
         <button onClick={() => setShowLog(true)} style={{ padding:"9px 20px", background:"var(--ink)", color:"var(--cream)", border:"none", borderRadius:4, fontSize:13, fontWeight:700, cursor:"pointer", fontFamily:"'Lato', sans-serif" }}>
           + Log Harvest
         </button>
       </div>
 
+      {/* Stats bar */}
       <div style={{ padding:"14px 48px", borderBottom:"1px solid var(--border)", background:"var(--cream)", display:"flex", gap:44, flexShrink:0 }}>
-        {[{label:"Varieties",value:18},{label:"Beds",value:3},{label:"Started indoors",value:SEEDS.filter(s=>s.status==="started").length},{label:"Days to last frost",value:"~47"},{label:"Harvests logged",value:harvests.length}].map(s=>(
+        {[
+          {label:"Varieties", value:SEEDS.length},
+          {label:"Beds", value:2},
+          {label:"Sow date", value:"May 19"},
+          {label:"Harvests logged", value:harvests.length},
+        ].map(s => (
           <div key={s.label}>
             <div style={{ fontSize:10, fontWeight:700, letterSpacing:"0.12em", textTransform:"uppercase", color:"var(--ink-faint)" }}>{s.label}</div>
             <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, fontWeight:600, color:"var(--sage)", marginTop:2 }}>{s.value}</div>
@@ -111,17 +100,20 @@ export default function GardenPage() {
         ))}
       </div>
 
+      {/* Tabs */}
       <div style={{ padding:"0 48px", borderBottom:"1px solid var(--border)", display:"flex", flexShrink:0 }}>
-        {([{key:"beds",label:"Beds"},{key:"calendar",label:"Planting Calendar"},{key:"harvest",label:"Harvest Log"}] as const).map(t=>(
+        {([{key:"beds",label:"Beds"},{key:"harvest",label:"Harvest Log"}] as const).map(t => (
           <button key={t.key} onClick={() => { setTab(t.key); setSelectedBed(null); }} style={{ padding:"13px 20px", fontSize:13, fontFamily:"'Lato', sans-serif", border:"none", borderBottom:tab===t.key?"2px solid var(--sage)":"2px solid transparent", background:"transparent", color:tab===t.key?"var(--sage)":"var(--ink-faint)", fontWeight:tab===t.key?700:400, cursor:"pointer", marginBottom:-1 }}>
             {t.label}
           </button>
         ))}
       </div>
 
+      {/* Content */}
       <div style={{ flex:1, overflowY:"auto", padding:"32px 48px" }}>
 
-        {tab==="beds" && !selectedBed && [1,2,3].map(bedNum => (
+        {/* Beds list */}
+        {tab==="beds" && !selectedBed && [1,2].map(bedNum => (
           <div key={bedNum} onClick={() => setSelectedBed(bedNum)} style={{ border:"1px solid var(--border)", borderRadius:8, marginBottom:16, overflow:"hidden", background:"var(--warm-white)", cursor:"pointer" }}
             onMouseEnter={e => (e.currentTarget as HTMLElement).style.borderColor=BED_COLORS[bedNum]}
             onMouseLeave={e => (e.currentTarget as HTMLElement).style.borderColor="var(--border)"}>
@@ -129,67 +121,45 @@ export default function GardenPage() {
               <div style={{ width:10, height:10, borderRadius:"50%", background:BED_COLORS[bedNum] }} />
               <div style={{ flex:1 }}>
                 <div style={{ fontFamily:"'Playfair Display', serif", fontSize:17, fontWeight:600 }}>{BED_NAMES[bedNum]}</div>
-                <div style={{ fontSize:12, color:"var(--ink-faint)", marginTop:2 }}>4 × 8 ft · {SEEDS.filter(s=>s.bed===bedNum).length} varieties</div>
+                <div style={{ fontSize:12, color:"var(--ink-faint)", marginTop:2 }}>4 × 8 ft · {SEEDS.filter(s=>s.bed===bedNum).length} varieties · sown May 19</div>
               </div>
               <div style={{ fontSize:18, color:"var(--ink-faint)" }}>›</div>
             </div>
             <div style={{ padding:"14px 22px", display:"flex", flexWrap:"wrap", gap:8 }}>
               {SEEDS.filter(s=>s.bed===bedNum).map(p => (
-                <div key={p.name+p.variety} style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 10px", borderRadius:20, background:TYPE_COLORS[p.type]+"18", border:`1px solid ${TYPE_COLORS[p.type]}33`, fontSize:12 }}>
+                <div key={p.name} style={{ display:"flex", alignItems:"center", gap:6, padding:"5px 10px", borderRadius:20, background:TYPE_COLORS[p.type]+"18", border:`1px solid ${TYPE_COLORS[p.type]}33`, fontSize:12 }}>
                   <span>{p.emoji}</span><span style={{ color:"var(--ink-light)" }}>{p.name}</span>
-                  {p.status==="started" && <span style={{ width:6, height:6, borderRadius:"50%", background:"var(--slate)" }} />}
                 </div>
               ))}
             </div>
           </div>
         ))}
 
+        {/* Bed detail */}
         {tab==="beds" && selectedBed && (
           <div>
             <button onClick={() => setSelectedBed(null)} style={{ fontSize:13, color:"var(--ink-faint)", background:"transparent", border:"none", cursor:"pointer", marginBottom:20, fontFamily:"'Lato', sans-serif" }}>← Back to beds</button>
             <div style={{ fontFamily:"'Playfair Display', serif", fontSize:22, marginBottom:24 }}>{BED_NAMES[selectedBed]}</div>
             {SEEDS.filter(s=>s.bed===selectedBed).map((p,i) => (
-              <div key={i} style={{ display:"flex", alignItems:"center", gap:16, padding:"13px 16px", borderRadius:8, marginBottom:2, border:"1px solid transparent", cursor:"pointer" }}
+              <div key={i} style={{ display:"flex", alignItems:"center", gap:16, padding:"13px 16px", borderRadius:8, marginBottom:2, border:"1px solid transparent" }}
                 onMouseEnter={e => { (e.currentTarget as HTMLElement).style.background="var(--cream)"; (e.currentTarget as HTMLElement).style.borderColor="var(--border)"; }}
                 onMouseLeave={e => { (e.currentTarget as HTMLElement).style.background="transparent"; (e.currentTarget as HTMLElement).style.borderColor="transparent"; }}>
                 <span style={{ fontSize:22 }}>{p.emoji}</span>
                 <div style={{ flex:1 }}>
                   <div style={{ fontSize:14, fontWeight:700 }}>{p.name} <span style={{ fontWeight:300, fontSize:12, color:"var(--ink-faint)" }}>— {p.variety}</span></div>
                   <div style={{ fontSize:12, color:"var(--ink-faint)", marginTop:2 }}>
-                    {(p as any).indoorStart ? `Start indoors ${(p as any).indoorStart} · Transplant ${(p as any).transplant}` : `Direct sow ${(p as any).directSow}`} · Harvest {p.harvest} · {p.spacing}" spacing
+                    Direct sown May 19 · Harvest {p.harvest} · {p.spacing}" spacing
                   </div>
                 </div>
-                <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:3, background:p.status==="started"?"rgba(91,127,166,0.12)":"rgba(140,128,112,0.1)", color:p.status==="started"?"var(--slate)":"var(--ink-faint)" }}>
-                  {p.status==="started"?"Started indoors":"Not started"}
+                <span style={{ fontSize:10, fontWeight:700, padding:"2px 7px", borderRadius:3, background:"rgba(122,158,126,0.15)", color:"var(--sage)" }}>
+                  Sown
                 </span>
               </div>
             ))}
           </div>
         )}
 
-        {tab==="calendar" && (
-          <div style={{ maxWidth:720 }}>
-            <div style={{ fontSize:13, color:"var(--ink-faint)", marginBottom:28, fontStyle:"italic" }}>Zone 6a · Ann Arbor, MI · Last frost April 20</div>
-            {TIMELINE.map((event, i) => (
-              <div key={i} style={{ display:"flex", gap:20, marginBottom:20 }}>
-                <div style={{ width:110, flexShrink:0, paddingTop:3, fontFamily:"'Playfair Display', serif", fontSize:13, fontWeight:700, color:event.color }}>{event.month}</div>
-                <div style={{ display:"flex", flexDirection:"column", alignItems:"center", flexShrink:0 }}>
-                  <div style={{ width:10, height:10, borderRadius:"50%", background:event.color, marginTop:4 }} />
-                  {i < TIMELINE.length-1 && <div style={{ width:2, flex:1, background:"var(--border)", marginTop:4 }} />}
-                </div>
-                <div style={{ flex:1, paddingBottom:16 }}>
-                  <div style={{ fontSize:11, fontWeight:700, letterSpacing:"0.1em", textTransform:"uppercase", color:event.color, marginBottom:6 }}>{event.label}</div>
-                  <div style={{ display:"flex", flexWrap:"wrap", gap:6 }}>
-                    {event.items.map(item => (
-                      <span key={item} style={{ fontSize:12, padding:"3px 9px", borderRadius:20, background:event.color+"15", color:"var(--ink-light)", border:`1px solid ${event.color}30` }}>{item}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
+        {/* Harvest log */}
         {tab==="harvest" && (
           <div>
             <div style={{ display:"flex", gap:0, border:"1px solid var(--border)", borderRadius:6, overflow:"hidden", width:"fit-content", marginBottom:28 }}>
@@ -203,7 +173,20 @@ export default function GardenPage() {
             {harvests.length === 0 && (
               <div style={{ textAlign:"center", padding:"60px 0", color:"var(--ink-faint)" }}>
                 <div style={{ fontSize:36, marginBottom:12 }}>🌱</div>
-                <div style={{ fontSize:14 }}>No harvests yet — check back in June!</div>
+                <div style={{ fontSize:14 }}>No harvests yet — check back in a few weeks!</div>
+              </div>
+            )}
+
+            {harvests.length > 0 && harvestView==="summary" && (
+              <div style={{ display:"grid", gridTemplateColumns:"repeat(auto-fill,minmax(180px,1fr))", gap:12 }}>
+                {Object.entries(harvestSummary).map(([plant, s]) => (
+                  <div key={plant} style={{ border:"1px solid var(--border)", borderRadius:8, padding:"16px 18px", background:"var(--warm-white)" }}>
+                    <div style={{ fontSize:24, marginBottom:8 }}>{s.emoji}</div>
+                    <div style={{ fontSize:13, fontWeight:700, marginBottom:2 }}>{plant}</div>
+                    <div style={{ fontSize:12, color:"var(--ink-faint)" }}>Bed {s.bed}</div>
+                    <div style={{ fontSize:18, fontFamily:"'Playfair Display', serif", color:"var(--sage)", marginTop:8 }}>{s.amount} <span style={{ fontSize:12 }}>{s.unit}</span></div>
+                  </div>
+                ))}
               </div>
             )}
 
@@ -226,6 +209,7 @@ export default function GardenPage() {
         )}
       </div>
 
+      {/* Log Harvest Modal */}
       {showLog && (
         <div style={{ position:"fixed", inset:0, background:"rgba(30,26,20,0.55)", display:"flex", alignItems:"center", justifyContent:"center", zIndex:50 }} onClick={() => setShowLog(false)}>
           <div style={{ background:"var(--warm-white)", borderRadius:10, width:480, padding:32, boxShadow:"0 24px 64px rgba(0,0,0,0.28)" }} onClick={e => e.stopPropagation()}>
@@ -235,9 +219,9 @@ export default function GardenPage() {
               <div>
                 <div style={{ fontSize:12, fontWeight:700, color:"var(--ink-light)", marginBottom:8 }}>Which bed?</div>
                 <div style={{ display:"flex", gap:8 }}>
-                  {[1,2,3].map(b => (
+                  {[1,2].map(b => (
                     <button key={b} onClick={() => { setLogBed(b); setLogPlant(""); }} style={{ flex:1, padding:"10px 8px", borderRadius:6, cursor:"pointer", border:`1px solid ${logBed===b?BED_COLORS[b]:"var(--border)"}`, background:logBed===b?BED_COLORS[b]+"18":"var(--warm-white)", fontFamily:"'Lato', sans-serif" }}>
-                      <div style={{ fontSize:13, fontWeight:logBed===b?700:400, color:logBed===b?BED_COLORS[b]:"var(--ink-faint)" }}>Bed {b}</div>
+                      <div style={{ fontSize:13, fontWeight:logBed===b?700:400, color:logBed===b?BED_COLORS[b]:"var(--ink-faint)" }}>{BED_NAMES[b]}</div>
                     </button>
                   ))}
                 </div>
