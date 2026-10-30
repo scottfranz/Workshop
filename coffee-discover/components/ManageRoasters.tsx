@@ -6,13 +6,14 @@ import { PLATFORM_LABELS } from "@/lib/scrapers/types";
 import { encodeShare, type CachedFeed, type SavedRoaster } from "@/lib/storage";
 import type { RoasterStatus } from "./Feed";
 
-export function ManageRoasters({ roasters, status, cache, onRename, onRecolor, onRemove, onRefresh }: {
+export function ManageRoasters({ roasters, status, cache, onRename, onRecolor, onRemove, onRemoveAll, onRefresh }: {
   roasters: SavedRoaster[];
   status: Record<string, RoasterStatus>;
   cache: Record<string, CachedFeed | undefined>;
   onRename: (id: string, name: string) => void;
   onRecolor: (id: string, color: string) => void;
   onRemove: (id: string) => void;
+  onRemoveAll: () => void;
   onRefresh: (id: string) => void;
 }) {
   const [copied, setCopied] = useState(false);
@@ -70,6 +71,11 @@ export function ManageRoasters({ roasters, status, cache, onRename, onRecolor, o
           );
         })}
       </ul>
+      {roasters.length > 1 && (
+        <div className="remove-all">
+          <button type="button" className="btn btn-ghost btn-danger" onClick={onRemoveAll}>Remove all roasters</button>
+        </div>
+      )}
       <h3 style={{ margin: "0 0 6px", fontSize: 16 }}>Use your list on another device</h3>
       <p className="hint" style={{ margin: "0 0 10px" }}>
         This link contains only your roasters&apos; names and web addresses. Open it on your phone or another browser to copy your list there.

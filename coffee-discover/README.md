@@ -41,4 +41,4 @@ npm run typecheck
 New Project → import this repo → set **Root Directory** to `coffee-discover`. No
 environment variables are needed.
 
-Rename the app or change starter roasters in `lib/site.ts`.
+Rename the app in `lib/site.ts`.
