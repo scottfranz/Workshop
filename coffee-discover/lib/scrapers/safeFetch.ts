@@ -132,6 +132,29 @@ async function safeFetchTextOnce(raw: string, accept: string): Promise<FetchedTe
   throw new FetchError("Too many redirects.");
 }
 
+/**
+ * The store (or a firewall in front of it, like Cloudflare) refused an automated
+ * request on purpose. Bean Feed respects that rather than trying to get around it.
+ */
+export function isBlocked(res: FetchedText): boolean {
+  if (res.status === 401 || res.status === 403) return true;
+  return res.status >= 400 && /Attention Required! \| Cloudflare|cf-browser-verification|challenge-platform|Just a moment\.\.\./i.test(res.body);
+}
+
+export const BLOCKED_MESSAGE =
+  "This roaster's website blocks automated readers like Bean Feed, so its coffees can't be shown here. That's the roaster's choice.";
+
+/** Parse a JSON body; null if it isn't JSON. */
+export function parseJsonBody(body: string): unknown {
+  const trimmed = body.trimStart();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) return null;
+  try {
+    return JSON.parse(trimmed);
+  } catch {
+    return null;
+  }
+}
+
 /** Fetch and parse JSON; returns null (rather than throwing) for non-2xx or non-JSON bodies. */
 export async function safeFetchJson(raw: string): Promise<{ url: string; data: unknown } | null> {
   const res = await safeFetchText(raw, "application/json");
