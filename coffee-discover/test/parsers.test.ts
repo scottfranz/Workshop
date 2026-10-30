@@ -16,7 +16,7 @@ describe("shopify", () => {
       id: "7001",
       url: "https://roaster.example/products/ethiopia-guji-hambela",
       image: "https://cdn.shopify.com/s/files/1/guji.jpg",
-      price: 19.5,
+      price: 22, // the 19.50 size is sold out
       currency: "USD",
       available: true,
       publishedAt: "2026-10-20T13:00:00.000Z",
@@ -132,6 +132,12 @@ describe("coffee filter", () => {
     ["Coffee Subscription", {}],
     ["Ceramic Mug", {}],
     ["Barista Toolkit", { productType: "Tools", description: "Great for espresso" }],
+    // found on live stores
+    ["1ZPRESSO - Q", { productType: "Grinder" }],
+    ["Ode Brew Grinder Gen 2", { productType: "Coffee Equipment" }],
+    ["Rainbow Hopper Easy Sub", { options: ["12oz"] }],
+    ["Monarch - Cometeer", { productType: "Coffee" }],
+    ["Salted Mocha RTD", {}],
   ])("drops %s", (title, extra) => {
     expect(coffee(title, extra)).toBe(false);
   });
@@ -155,6 +161,25 @@ describe("coffee filter", () => {
   it("trusts an explicit coffee product type but not a gear one", () => {
     expect(coffee("Server Room", { productType: "Coffee" })).toBe(true);
     expect(coffee("Ethiopia", { productType: "Merchandise" })).toBe(false);
+  });
+});
+
+describe("bag pricing", () => {
+  it("ignores sample sizes when a real bag size exists", async () => {
+    const { isSampleSize } = await import("@/lib/scrapers/text");
+    expect(["40g", "2 oz", "Sample", "50 grams"].map(isSampleSize)).toEqual([true, true, true, true]);
+    expect(["250g", "12oz", "1kg", "5 lb", "Default Title"].map(isSampleSize)).toEqual([false, false, false, false, false]);
+    const data = { products: [{ ...fx.shopifyProducts.products[0], variants: [
+      { title: "250g", price: "28.00", available: true }, { title: "40g", price: "7.00", available: true }, { title: "1kg", price: "98.00", available: true },
+    ] }] };
+    expect(parseShopify(data, "https://r.example")[0].price).toBe(28);
+  });
+
+  it("prices from in-stock sizes when some are sold out", () => {
+    const data = { products: [{ ...fx.shopifyProducts.products[0], variants: [
+      { title: "250g", price: "20.00", available: false }, { title: "1kg", price: "70.00", available: true },
+    ] }] };
+    expect(parseShopify(data, "https://r.example")[0].price).toBe(70);
   });
 });
 

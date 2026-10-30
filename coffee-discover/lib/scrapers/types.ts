@@ -1,9 +1,10 @@
-export type Platform = "shopify" | "woocommerce" | "squarespace" | "bigcartel" | "jsonld";
+export type Platform = "shopify" | "woocommerce" | "squarespace" | "square" | "bigcartel" | "jsonld";
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   shopify: "Shopify",
   woocommerce: "WooCommerce",
   squarespace: "Squarespace",
+  square: "Square Online",
   bigcartel: "Big Cartel",
   jsonld: "Web page",
 };

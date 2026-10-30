@@ -65,7 +65,7 @@ export function filterAndSort(items: FeedItem[], prefs: Prefs, opts: { roasterId
   const q = opts.query.trim().toLowerCase();
   const out = items.filter((i) => {
     if (opts.hidden.has(i.key)) return false;
-    if (prefs.hideSoldOut && !i.available) return false;
+    if (!i.available) return false;
     if (opts.roasterId && i.roasterId !== opts.roasterId) return false;
     if (q && !`${i.title} ${i.roasterName} ${i.description ?? ""}`.toLowerCase().includes(q)) return false;
     return true;

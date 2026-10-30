@@ -46,7 +46,7 @@ describe("filterAndSort", () => {
     expect(filterAndSort(items, DEFAULT_PREFS, opts).map((i) => i.id)).toEqual(["cheap", "pricey"]);
   });
   it("sorts by price and respects hidden keys", () => {
-    const prefs = { ...DEFAULT_PREFS, sort: "price-desc" as const, hideSoldOut: false };
+    const prefs = { ...DEFAULT_PREFS, sort: "price-desc" as const };
     expect(filterAndSort(items, prefs, { ...opts, hidden: new Set(["https://r.example::sold"]) }).map((i) => i.id)).toEqual(["pricey", "cheap"]);
   });
 });

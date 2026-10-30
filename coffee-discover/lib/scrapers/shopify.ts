@@ -1,6 +1,6 @@
 import { keepCoffee } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
-import { absoluteUrl, minPrice, stripHtml, summarize, toIso } from "./text";
+import { absoluteUrl, isSampleSize, minPrice, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
 
 interface ShopifyProduct {
@@ -24,6 +24,16 @@ export function shopifyProductsEndpoint(feedUrl: string): string {
   return `${u.origin}${collection ? collection[0] : ""}/products.json`;
 }
 
+type Variant = NonNullable<ShopifyProduct["variants"]>[number];
+
+/** Variants that are real bags: in stock if any are, and not tiny sample sizes if bigger ones exist. */
+function bagVariants(variants: Variant[]): Variant[] {
+  const inStock = variants.filter((v) => v.available !== false);
+  const pool = inStock.length ? inStock : variants;
+  const full = pool.filter((v) => !isSampleSize(v.title));
+  return full.length ? full : pool;
+}
+
 export function parseShopify(data: unknown, feedUrl: string, currency: string | null = null): Product[] {
   const list = (data as { products?: ShopifyProduct[] })?.products;
   if (!Array.isArray(list)) return [];
@@ -44,7 +54,7 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       title,
       url: `${origin}/products/${p.handle}`,
       image: absoluteUrl(p.images?.[0]?.src, origin),
-      price: minPrice(variants.map((v) => v.price)),
+      price: minPrice(bagVariants(variants).map((v) => v.price)),
       currency,
       available: variants.length === 0 ? true : variants.some((v) => v.available !== false),
       publishedAt: toIso(p.published_at ?? p.created_at),

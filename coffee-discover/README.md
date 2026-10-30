@@ -15,7 +15,8 @@ list is stored in their own browser's localStorage.
   | Shopify | `/products.json` (+ `/meta.json` for name and currency); collection links supported |
   | WooCommerce | Public Store API `/wp-json/wc/store/v1/products`; `/product-category/...` links narrow it |
   | Squarespace | `?format=json` on the shop page; finds the shop from the homepage nav if needed |
-  | Big Cartel | `/products.json` + `/store.json` |
+  | Square Online | Store IDs from the page, then its `/app/store/api/v28/.../products` JSON API; `/shop/<name>/<id>` links narrow it |
+| Big Cartel | `/products.json` + `/store.json` |
   | Anything else | schema.org JSON-LD on the page, then up to 24 linked product pages |
 - **`lib/scrapers/filter.ts`**: drops gear, merch, gift cards and subscriptions.
 - **`lib/scrapers/safeFetch.ts`**: every outbound request goes through this. Public
@@ -31,6 +32,7 @@ list is stored in their own browser's localStorage.
 npm install
 npm run dev        # http://localhost:3000
 npm test           # parser, detection, SSRF and feed-logic tests
+LIVE_URLS=https://roaster.com,https://other.com npm run test:live   # try real stores
 npm run typecheck
 ```
 

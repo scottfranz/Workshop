@@ -107,3 +107,32 @@ export const jsonLdProductHtml = (name: string, price: string, availability = "h
 export const squarespaceHomeHtml = `<!doctype html><html><head><!-- This is Squarespace. -->
 <title>Little Roaster Co.</title></head><body>
 <nav><a href="/about">About</a><a href="/shop">Shop Coffee</a></nav></body></html>`;
+
+// Square Online: page HTML embeds the IDs; products come from a JSON API.
+export const squareHtml = `<!doctype html><html><head><title>Single Origin Coffees (lighter roasts) | S&amp;W Craft Roasting</title>
+<script>window.__BOOTSTRAP_STATE__ = {"siteData":{"currency":"USD"}}; var config = { user_id: '144301722', site_id: '609617072503030687' };</script>
+<link rel="preconnect" href="https://cdn6.editmysite.com"></head><body><div id="app"></div></body></html>`;
+
+const sq = (id: string, name: string, cats: string[], price: number, oos: boolean, desc: string) => ({
+  id, name, visibility: "visible", short_description: `<p>${desc}</p>`, site_link: `product/${id}/1`,
+  absolute_site_link: `https://sw.example/product/${id}/1`, created_date: "2026-10-01T00:00:00+00:00",
+  badges: { out_of_stock: oos }, price: { low: price, high: price }, categoryIds: cats,
+  images: { data: [{ absolute_url: `https://1.cdn6.editmysite.com/uploads/${id}.jpeg` }] },
+  categories: { data: cats.map((c) => ({ name: c === "4" ? "Archive" : "Single Origin Coffees (lighter roasts)" })) },
+});
+
+export const squareProductsPage1 = {
+  data: [
+    sq("kenya-kii", "Kenya Kii AB", ["X1", "2"], 17.1, false, "Blackcurrant and grapefruit."),
+    sq("brazil", "Brazil Daterra Summer Solstice", ["X2", "4"], 11.05, true, "Lemon, lavender, rose tea."),
+    sq("sample", "Add a Sample", ["2"], 0.01, false, "Where have all the samples gone?"),
+    sq("tip", "Thank the fellas!", ["2"], 1, false, "How can I leave a tip?"),
+    { ...sq("hidden", "Hidden Peru", ["2"], 15, false, "Peru"), visibility: "hidden" },
+  ],
+  meta: { pagination: { total: 6, total_pages: 2 } },
+};
+
+export const squareProductsPage2 = {
+  data: [sq("rwanda", "Rwanda Kinini Village Lot 5-28", ["2"], 15.65, false, "Red currant, black tea.")],
+  meta: { pagination: { total: 6, total_pages: 2 } },
+};

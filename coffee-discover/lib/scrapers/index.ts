@@ -2,6 +2,7 @@ import { fetchBigCartel, isBigCartelList, parseBigCartel } from "./bigcartel";
 import { collectSkipped, noteSkipped } from "./filter";
 import { fetchJsonLd } from "./jsonld";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
+import { fetchSquare, isSquareOnlineHtml } from "./square";
 import { fetchShopify, parseShopify, shopifyMeta, shopifyProductsEndpoint } from "./shopify";
 import {
   SQUARESPACE_SHOP_GUESSES, fetchSquarespace, isSquarespaceProductPage, parseSquarespace, siteTitle, withFormatJson,
@@ -12,7 +13,7 @@ import { fetchWooCommerce, parseWooCommerce, wooEndpoint } from "./woocommerce";
 
 const MAX_PRODUCTS = 300;
 
-export const PLATFORMS: Platform[] = ["shopify", "woocommerce", "squarespace", "bigcartel", "jsonld"];
+export const PLATFORMS: Platform[] = ["shopify", "woocommerce", "squarespace", "square", "bigcartel", "jsonld"];
 
 export function normalizeUrl(raw: string): string {
   let s = raw.trim();
@@ -38,11 +39,22 @@ export function dropOtherMarketListings(products: Product[]): Product[] {
   return products.filter((p) => !CJK.test(p.title));
 }
 
+// Tips, add-ons and free samples ($0.01, $1) aren't bags of coffee. Skipped for
+// currencies where 2 units is still a real price floor problem (JPY, KRW...).
+const SMALL_UNIT_CURRENCIES = new Set(["JPY", "KRW", "VND", "IDR", "CLP", "COP", "HUF", "TWD", "INR", "THB", "PHP"]);
+function isRealPrice(p: Product): boolean {
+  if (p.price === null || p.price >= 2 || (p.currency && SMALL_UNIT_CURRENCIES.has(p.currency))) return true;
+  noteSkipped(p.title);
+  return false;
+}
+
 function finish(source: FeedSource, siteName: string | null, products: Product[]): RoasterFeed {
   return {
     source,
     siteName,
-    products: dropOtherMarketListings(products)
+    products: dropOtherMarketListings(products.filter(isRealPrice))
+      // Big catalogues are mostly sold-out archives; make sure the cap keeps what's buyable.
+      .sort((a, b) => Number(b.available) - Number(a.available))
       .slice(0, MAX_PRODUCTS)
       .map((p) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
   };
@@ -53,9 +65,21 @@ async function withSkipped(fn: () => Promise<RoasterFeed>): Promise<RoasterFeed>
   return { ...feed, skipped: skipped.map((t) => preferLatin(t)) };
 }
 
-/** Read a roaster whose platform we already know. */
+/**
+ * Read a roaster whose platform we already know. Roasters do move (WooCommerce
+ * to Shopify, new domain), so if the saved setup stops working, detect afresh;
+ * the response's source tells the client to update what it saved.
+ */
 export function fetchFeed(source: FeedSource): Promise<RoasterFeed> {
-  return withSkipped(() => fetchFeedInner(source));
+  return withSkipped(async () => {
+    try {
+      return await fetchFeedInner(source);
+    } catch (err) {
+      const fresh = await detectFeedInner(source.feedUrl).catch(() => null);
+      if (fresh && fresh.products.length > 0) return fresh;
+      throw err;
+    }
+  });
 }
 
 /** Work out how to read a store from whatever link someone pasted. */
@@ -68,6 +92,7 @@ async function fetchFeedInner(source: FeedSource): Promise<RoasterFeed> {
     shopify: fetchShopify,
     woocommerce: fetchWooCommerce,
     squarespace: fetchSquarespace,
+    square: (url) => fetchSquare(url),
     bigcartel: fetchBigCartel,
     jsonld: (url) => fetchJsonLd(url),
   };
@@ -109,7 +134,7 @@ async function detectSquarespace(url: string, html: string): Promise<RoasterFeed
 }
 
 // Homepage, shop page or collection link: cheapest, most reliable checks go first.
-async function detectFeedInner(rawUrl: string): Promise<RoasterFeed> {
+async function detectFeedInner(rawUrl: string, followedMove = false): Promise<RoasterFeed> {
   const url = normalizeUrl(rawUrl);
   const origin = new URL(url).origin;
 
@@ -143,11 +168,22 @@ async function detectFeedInner(rawUrl: string): Promise<RoasterFeed> {
   if (page.status >= 400) throw new FetchError(`The site returned an error (${page.status}). Is the link right?`, page.status);
   const html = page.body;
 
+  // The roaster moved to a new domain (e.g. subtextcoffee.com → subtext.coffee): start over there.
+  const landedOn = new URL(page.url);
+  if (!followedMove && landedOn.hostname.replace(/^www\./, "") !== new URL(url).hostname.replace(/^www\./, "")) {
+    return detectFeedInner(landedOn.origin + new URL(url).pathname, true);
+  }
+
   // The page is Shopify but /products.json didn't answer the first time. That's
   // usually a momentary block or rate limit, so try once more before falling back.
   if (isShopifyHtml(html)) {
     const retry = await fetchShopify(url).catch(() => null);
     if (retry && retry.products.length > 0) return finish({ platform: "shopify", feedUrl: url }, retry.siteName, retry.products);
+  }
+
+  if (isSquareOnlineHtml(html)) {
+    const sq = await fetchSquare(url, html);
+    return finish({ platform: "square", feedUrl: url }, sq.siteName, sq.products);
   }
 
   if (isSquarespaceHtml(html)) {

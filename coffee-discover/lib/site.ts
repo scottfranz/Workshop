@@ -5,10 +5,10 @@ export const SITE_TAGLINE = "New coffees from the roasters you love. No account,
 // Starter suggestions shown to new visitors. Detection runs when they're added,
 // so these only need a working link.
 export const SUGGESTED_ROASTERS: { name: string; url: string }[] = [
-  { name: "Subtext Coffee", url: "https://subtextcoffee.com" },
+  { name: "Subtext Coffee", url: "https://www.subtext.coffee" },
   { name: "Rogue Wave Coffee", url: "https://roguewavecoffee.com" },
   { name: "Tandem Coffee", url: "https://www.tandemcoffee.com" },
-  { name: "Prodigal Coffee", url: "https://www.prodigalcoffee.com" },
+  { name: "S&W Craft Roasting", url: "https://www.swroasting.coffee" },
   { name: "Onyx Coffee Lab", url: "https://onyxcoffeelab.com" },
   { name: "Regalia Coffee", url: "https://regaliacoffee.com" },
 ];

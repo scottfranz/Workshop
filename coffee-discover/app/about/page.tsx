@@ -37,7 +37,7 @@ export default function About() {
 
         <h2>Which shops work</h2>
         <ul>
-          <li><strong>Shopify</strong>, <strong>WooCommerce</strong>, <strong>Squarespace</strong> and <strong>Big Cartel</strong> shops are read from their built-in product feeds.</li>
+          <li><strong>Shopify</strong>, <strong>WooCommerce</strong>, <strong>Squarespace</strong>, <strong>Square Online</strong> and <strong>Big Cartel</strong> shops are read from their built-in product feeds.</li>
           <li>Other shops work if they publish product details for search engines (most do). We read those from the page you give us and up to 24 product pages linked from it.</li>
           <li>If a homepage doesn&apos;t work, try the link to the roaster&apos;s coffee page. A specific collection link narrows your feed to just that collection.</li>
         </ul>
