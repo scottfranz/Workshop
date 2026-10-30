@@ -66,7 +66,6 @@ export function filterAndSort(items: FeedItem[], prefs: Prefs, opts: { roasterId
   const out = items.filter((i) => {
     if (opts.hidden.has(i.key)) return false;
     if (prefs.hideSoldOut && !i.available) return false;
-    if (prefs.newOnly && !i.isNew) return false;
     if (opts.roasterId && i.roasterId !== opts.roasterId) return false;
     if (q && !`${i.title} ${i.roasterName} ${i.description ?? ""}`.toLowerCase().includes(q)) return false;
     return true;
@@ -76,7 +75,7 @@ export function filterAndSort(items: FeedItem[], prefs: Prefs, opts: { roasterId
     case "price-asc": return out.sort((a, b) => price(a, Infinity) - price(b, Infinity));
     case "price-desc": return out.sort((a, b) => price(b, -1) - price(a, -1));
     case "roaster": return out.sort((a, b) => a.roasterName.localeCompare(b.roasterName) || b.arrivedAt - a.arrivedAt);
-    default: return out.sort((a, b) => Number(b.isNew) - Number(a.isNew) || b.arrivedAt - a.arrivedAt);
+    default: return out.sort((a, b) => b.arrivedAt - a.arrivedAt);
   }
 }
 

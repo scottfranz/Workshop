@@ -83,7 +83,8 @@ button, input, select { font: inherit; color: inherit; }
 .chip { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 14px; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
 .chip-count { font-size: 12px; opacity: 0.7; font-variant-numeric: tabular-nums; }
-.chip-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--new); }
+.chip-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--rc, var(--ink-3)); }
+.chip[aria-pressed="true"] .chip-dot { box-shadow: 0 0 0 2px var(--bg); }
 .chip-dot.error { background: var(--danger); }
 .chip-dot.loading { background: var(--ink-3); animation: pulse 1s ease-in-out infinite alternate; }
 @keyframes pulse { from { opacity: 0.3; } to { opacity: 1; } }
@@ -100,31 +101,68 @@ button, input, select { font: inherit; color: inherit; }
 .notice { padding: 12px 16px; border-radius: var(--radius); background: var(--surface-2); color: var(--ink-2); font-size: 14px; margin-bottom: 16px; }
 
 /* ── Grid + cards ───────────────────────────────────────── */
+/* --rc is the roaster's color, set inline per card. --rc-ink is a darker or
+   lighter version of it that stays readable against the page. */
+.card, .row, .chip-dot { --rc-ink: color-mix(in srgb, var(--rc, var(--accent)) 72%, black); }
+@media (prefers-color-scheme: dark) {
+  .card, .row, .chip-dot { --rc-ink: color-mix(in srgb, var(--rc, var(--accent)) 65%, white); }
+}
+
 .grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; padding-bottom: 48px; }
 @media (min-width: 700px) { .grid { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; } }
 @media (min-width: 1000px) { .grid { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 20px; } }
 
 .card { position: relative; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); transition: transform 0.15s ease; }
 .card:hover { transform: translateY(-2px); }
-.card.sold-out .card-img img { filter: grayscale(0.7); opacity: 0.7; }
+.sold-out .card-img img { filter: grayscale(0.7); opacity: 0.7; }
+.card-media { position: relative; border-bottom: 3px solid var(--rc, transparent); }
 .card-img { display: block; aspect-ratio: 1; background: var(--surface-2); overflow: hidden; }
 .card-img img { width: 100%; height: 100%; object-fit: cover; }
 .card-body { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; flex: 1; }
-.card-roaster { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
 .card-title { font-family: var(--font-serif); font-size: 17px; font-weight: 700; line-height: 1.25; margin: 0; }
 .card-title a { text-decoration: none; }
-.card-title a::after { content: ""; position: absolute; inset: 0; } /* whole card is the link */
+.card .card-title a::after { content: ""; position: absolute; inset: 0; } /* whole card is the link */
 .card-desc { font-size: 13px; color: var(--ink-2); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; margin: 0; }
 .card-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-top: auto; padding-top: 6px; font-size: 14px; }
 .price { font-weight: 700; font-variant-numeric: tabular-nums; }
 .muted { color: var(--ink-3); font-size: 13px; }
-.badge { position: absolute; top: 10px; left: 10px; padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--new); color: var(--surface); }
-.badge.sold { background: var(--ink-2); }
-.card-hide { position: absolute; top: 8px; right: 8px; z-index: 1; width: 32px; height: 32px; border-radius: 50%; border: 0; background: color-mix(in srgb, var(--surface) 85%, transparent); color: var(--ink-2); cursor: pointer; font-size: 18px; line-height: 1; opacity: 0; transition: opacity 0.15s; }
-.card:hover .card-hide, .card-hide:focus-visible { opacity: 1; }
-@media (hover: none) { .card-hide { opacity: 1; } }
-.card-roaster, .card-hide { position: relative; z-index: 1; }
-.card-hide { position: absolute; }
+
+.badge { padding: 3px 9px; border-radius: 999px; font-size: 12px; font-weight: 700; background: var(--ink-2); color: var(--surface); white-space: nowrap; }
+.card .badge { position: absolute; top: 10px; left: 10px; }
+
+/* Buttons layered over the card-wide link. */
+.card-hide, .roaster-tag, .row-roaster { position: relative; z-index: 2; }
+.card-hide { position: absolute; top: 8px; right: 8px; width: 28px; height: 28px; border-radius: 50%; border: 0; background: rgba(30, 26, 20, 0.6); color: #fff; cursor: pointer; font-size: 18px; line-height: 1; display: grid; place-items: center; }
+.card-hide:hover { background: rgba(30, 26, 20, 0.85); }
+.roaster-tag { position: absolute; left: 8px; bottom: 8px; max-width: calc(100% - 16px); padding: 3px 9px; border: 0; border-radius: 6px; background: color-mix(in srgb, var(--rc, var(--accent)) 80%, black); color: #fff; font-size: 12px; font-weight: 700; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.roaster-tag:hover { filter: brightness(1.1); }
+
+/* ── List view ──────────────────────────────────────────── */
+.list { display: flex; flex-direction: column; padding-bottom: 48px; border-top: 1px solid var(--line); }
+.row { position: relative; display: grid; grid-template-columns: 64px minmax(0, 1fr) auto 32px; gap: 14px; align-items: center; padding: 12px 4px; border-bottom: 1px solid var(--line); border-left: 4px solid var(--rc, transparent); padding-left: 12px; }
+.row:hover { background: var(--surface); }
+.row .card-img { width: 64px; height: 64px; aspect-ratio: auto; border-radius: 8px; }
+.row-info { min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.row .card-title { font-size: 16px; }
+.row-roaster { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 0; border: 0; background: none; color: var(--rc-ink); font-size: 13px; font-weight: 700; cursor: pointer; }
+.row-roaster:hover { text-decoration: underline; }
+.roaster-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--rc); flex: none; }
+.row-desc { -webkit-line-clamp: 1; }
+.row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 4px; }
+.row .card-hide { position: static; background: transparent; color: var(--ink-3); width: 32px; height: 32px; }
+.row .card-hide:hover { background: var(--surface-2); color: var(--ink); }
+@media (max-width: 520px) {
+  .row { grid-template-columns: 52px minmax(0, 1fr) auto; gap: 10px; padding-left: 8px; }
+  .row .card-img { width: 52px; height: 52px; }
+  .row-desc { display: none; }
+  .row .card-hide { grid-column: 3; grid-row: 1; position: absolute; top: 4px; right: 0; width: 28px; height: 28px; }
+  .row-side { padding-right: 26px; }
+}
+
+/* ── Layout toggle ──────────────────────────────────────── */
+.segmented { display: inline-flex; border: 1px solid var(--line); border-radius: 999px; overflow: hidden; background: var(--surface); }
+.segmented button { min-width: 40px; min-height: 38px; border: 0; background: transparent; cursor: pointer; font-size: 16px; color: var(--ink-3); }
+.segmented button[aria-pressed="true"] { background: var(--ink); color: var(--bg); }
 
 .skeleton { background: linear-gradient(90deg, var(--surface-2), var(--surface), var(--surface-2)); background-size: 200% 100%; animation: shimmer 1.2s linear infinite; }
 @keyframes shimmer { to { background-position: -200% 0; } }
@@ -164,6 +202,10 @@ dialog::backdrop { background: rgba(20, 14, 9, 0.5); }
 .skipped { margin-top: 6px; }
 .skipped summary { cursor: pointer; width: fit-content; }
 .skipped ul { margin: 6px 0 0; padding-left: 18px; max-height: 180px; overflow-y: auto; }
+.name-cell { display: flex; align-items: center; gap: 8px; min-width: 0; }
+.color-swatch { position: relative; flex: none; width: 22px; height: 22px; border-radius: 50%; cursor: pointer; box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.15); }
+.color-swatch input { position: absolute; inset: 0; opacity: 0; width: 100%; height: 100%; cursor: pointer; border: 0; padding: 0; }
+.color-swatch:focus-within { outline: 3px solid var(--accent); outline-offset: 2px; }
 .row-actions { display: flex; gap: 4px; }
 
 .site-footer { border-top: 1px solid var(--line); padding: 24px 0 40px; color: var(--ink-3); font-size: 14px; }

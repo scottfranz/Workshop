@@ -5,8 +5,8 @@ import { buildItems, filterAndSort, markSeen, type FeedItem } from "@/lib/feed";
 import type { Product, RoasterFeed } from "@/lib/scrapers/types";
 import { SITE_NAME, SUGGESTED_ROASTERS } from "@/lib/site";
 import {
-  beginVisit, decodeShare, emptyState, loadCache, loadState, saveCache, saveState,
-  type CachedFeed, type Prefs, type SavedRoaster, type SavedState, type SortMode,
+  ROASTER_COLORS, beginVisit, decodeShare, emptyState, loadCache, loadState, pickColor, saveCache, saveState, withColors,
+  type CachedFeed, type Prefs, type SavedRoaster, type SavedState, type SortMode, type ViewMode,
 } from "@/lib/storage";
 import { AddRoasterForm } from "./AddRoasterForm";
 import { Dialog } from "./Dialog";
@@ -106,6 +106,7 @@ export function Feed() {
     const now = Date.now();
     const roaster: SavedRoaster = {
       id, name: name || feed.siteName || hostName(id), platform: feed.source.platform, feedUrl: id, addedAt: now,
+      color: pickColor(stateRef.current.roasters.map((r) => r.color)),
     };
     setState((s) => ({ ...s, roasters: [...s.roasters, roaster], seen: markSeen(s.seen, id, feed.products, now) }));
     setCache((c) => ({ ...c, [id]: { fetchedAt: now, products: feed.products, skipped: feed.skipped } }));
@@ -124,7 +125,7 @@ export function Feed() {
     if (!pendingImport) return;
     const now = Date.now();
     const added = pendingImport.map((r) => ({ ...r, addedAt: now }));
-    setState((s) => ({ ...s, roasters: [...s.roasters, ...added.filter((a) => !s.roasters.some((x) => x.id === a.id))] }));
+    setState((s) => ({ ...s, roasters: withColors([...s.roasters, ...added.filter((a) => !s.roasters.some((x) => x.id === a.id))]) }));
     setPendingImport(null);
     refreshMany(added);
   }
@@ -147,7 +148,8 @@ export function Feed() {
     () => filterAndSort(allItems, state.prefs, { roasterId: roasterFilter, query, hidden }),
     [allItems, state.prefs, roasterFilter, query, hidden],
   );
-  const countFor = (id: string | null) => filterAndSort(allItems, { ...state.prefs, newOnly: false }, { roasterId: id, query: "", hidden }).length;
+  const countFor = (id: string | null) => filterAndSort(allItems, state.prefs, { roasterId: id, query: "", hidden }).length;
+  const colorOf = (id: string) => state.roasters.find((r) => r.id === id)?.color ?? ROASTER_COLORS[0];
   const sinceLastVisit = allItems.filter((i) => i.sinceLastVisit && i.available && !hidden.has(i.key)).length;
   const anyLoading = Object.values(status).some((s) => s.state === "loading");
   const errors = state.roasters.filter((r) => status[r.id]?.state === "error");
@@ -170,8 +172,8 @@ export function Feed() {
               <button type="button" className="btn" onClick={() => setDialog("manage")}>
                 Roasters <span className="hide-sm">({state.roasters.length})</span>
               </button>
-              <button type="button" className="btn btn-primary" onClick={() => setDialog("add")}>
-                + <span className="hide-sm">Follow</span><span className="sr-only">a roaster</span>
+              <button type="button" className="btn btn-primary" onClick={() => setDialog("add")} aria-label="Follow a roaster">
+                + <span className="hide-sm" aria-hidden="true">Follow</span>
               </button>
             </div>
           )}
@@ -207,7 +209,7 @@ export function Feed() {
                   <button key={r.id} type="button" className="chip" aria-pressed={roasterFilter === r.id}
                     onClick={() => setRoasterFilter(roasterFilter === r.id ? null : r.id)}
                     title={s === "error" ? `Couldn't update ${r.name}` : undefined}>
-                    {(s === "loading" || s === "error") && <span className={`chip-dot ${s}`} aria-hidden="true" />}
+                    <span className={`chip-dot ${s === "loading" || s === "error" ? s : ""}`} style={{ "--rc": colorOf(r.id) } as React.CSSProperties} aria-hidden="true" />
                     {r.name} <span className="chip-count">{countFor(r.id)}</span>
                   </button>
                 );
@@ -218,9 +220,6 @@ export function Feed() {
               <label className="sr-only" htmlFor="search">Search coffees</label>
               <input id="search" className="search" type="search" placeholder="Search origin, process, notes…" value={query} onChange={(e) => setQuery(e.target.value)} />
               <label className="toggle">
-                <input type="checkbox" checked={state.prefs.newOnly} onChange={(e) => setPref("newOnly", e.target.checked)} /> New only
-              </label>
-              <label className="toggle">
                 <input type="checkbox" checked={!state.prefs.hideSoldOut} onChange={(e) => setPref("hideSoldOut", !e.target.checked)} /> Show sold out
               </label>
               <label className="sr-only" htmlFor="sort">Sort</label>
@@ -230,12 +229,18 @@ export function Feed() {
                 <option value="price-desc">Price: high to low</option>
                 <option value="roaster">By roaster</option>
               </select>
+              <div className="segmented" role="group" aria-label="Layout">
+                {(["grid", "list"] as ViewMode[]).map((v) => (
+                  <button key={v} type="button" aria-pressed={state.prefs.view === v} onClick={() => setPref("view", v)} title={v === "grid" ? "Grid" : "List"}>
+                    <span aria-hidden="true">{v === "grid" ? "▦" : "☰"}</span><span className="sr-only">{v === "grid" ? "Grid view" : "List view"}</span>
+                  </button>
+                ))}
+              </div>
             </div>
 
-            {sinceLastVisit > 0 && !state.prefs.newOnly && (
+            {sinceLastVisit > 0 && (
               <div className="banner" role="status">
                 <span><strong>{sinceLastVisit} new coffee{sinceLastVisit === 1 ? "" : "s"}</strong> since your last visit.</span>
-                <button type="button" className="btn" onClick={() => setPref("newOnly", true)}>Show new only</button>
               </div>
             )}
 
@@ -257,15 +262,16 @@ export function Feed() {
             )}
 
             {firstLoad ? (
-              <div className="grid">{Array.from({ length: 8 }, (_, i) => <SkeletonCard key={i} />)}</div>
+              <div className={state.prefs.view}>{Array.from({ length: 8 }, (_, i) => <SkeletonCard key={i} view={state.prefs.view} />)}</div>
             ) : visible.length === 0 ? (
               <p className="empty">
-                {query ? `Nothing matches “${query}”.` : state.prefs.newOnly ? "Nothing new right now. Check back soon." : "No coffees in stock right now."}
+                {query ? `Nothing matches “${query}”.` : "No coffees in stock right now."}
               </p>
             ) : (
-              <section className="grid" aria-label="Coffees">
+              <section className={state.prefs.view} aria-label="Coffees">
                 {visible.map((item) => (
-                  <ProductCard key={item.key} item={item} onHide={() => hide(item.key)} onRoaster={() => setRoasterFilter(item.roasterId)} />
+                  <ProductCard key={item.key} item={item} color={colorOf(item.roasterId)} view={state.prefs.view}
+                    onHide={() => hide(item.key)} onRoaster={() => setRoasterFilter(item.roasterId)} />
                 ))}
               </section>
             )}
@@ -282,6 +288,7 @@ export function Feed() {
           roasters={state.roasters}
           status={status}
           cache={cache}
+          onRecolor={(id, color) => setState((s) => ({ ...s, roasters: s.roasters.map((r) => (r.id === id ? { ...r, color } : r)) }))}
           onRename={(id, name) => setState((s) => ({ ...s, roasters: s.roasters.map((r) => (r.id === id ? { ...r, name } : r)) }))}
           onRemove={removeRoaster}
           onRefresh={(id) => { const r = state.roasters.find((x) => x.id === id); if (r) refreshOne(r); }}
