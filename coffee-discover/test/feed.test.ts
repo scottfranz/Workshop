@@ -152,3 +152,12 @@ describe("price per cup", () => {
     expect(sorted.map((i) => i.id)).toEqual(["cheap-big", "pricey-small", "no-size"]);
   });
 });
+
+describe("usual bag size", () => {
+  it("fills in the visitor's bag size only where the store gives none", () => {
+    const r = { ...roaster, usualBagGrams: 250 };
+    const items = buildItems(r, [product("a"), product("b", { size: { grams: 340, label: "12 oz" } })], {}, null, NOW);
+    expect(items.map((i) => i.size)).toEqual([{ grams: 250, label: "250 g" }, { grams: 340, label: "12 oz" }]);
+    expect(buildItems(roaster, [product("a")], {}, null, NOW)[0].size).toBeNull();
+  });
+});

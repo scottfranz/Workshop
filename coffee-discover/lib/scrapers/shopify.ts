@@ -76,6 +76,20 @@ export async function shopifyMeta(feedUrl: string): Promise<{ name: string | nul
   return { name: meta?.name ?? null, currency: meta?.currency ?? null };
 }
 
+/**
+ * The currency the store will actually price in for our requests. Stores using
+ * Shopify Markets price for the visitor's country (our servers are in the US),
+ * and ?currency= is only honoured if the store offers that currency there:
+ * Luna (a Canadian store) answers CAD from Canada but USD from the US. The cart
+ * reports the currency in effect, so ask it, using the same ?currency= hint.
+ */
+export async function shopifyPricingCurrency(feedUrl: string, preferred: string | null): Promise<string | null> {
+  const hint = preferred ? `?currency=${encodeURIComponent(preferred)}` : "";
+  const res = await safeFetchJson(`${new URL(feedUrl).origin}/cart.js${hint}`).catch(() => null);
+  const currency = (res?.data as { currency?: string } | undefined)?.currency;
+  return typeof currency === "string" && /^[A-Z]{3}$/.test(currency) ? currency : preferred;
+}
+
 /** Product handles from the store's sitemap, or null if it can't be read (then nothing is filtered on it). */
 export async function shopifyListedHandles(feedUrl: string): Promise<Set<string> | null> {
   const origin = new URL(feedUrl).origin;
@@ -100,15 +114,16 @@ export async function shopifyListedHandles(feedUrl: string): Promise<Set<string>
   }
 }
 
-export async function fetchShopify(feedUrl: string): Promise<{ products: Product[]; siteName: string | null }> {
+/** @param preferredCurrency the visitor's chosen currency; defaults to the store's own. */
+export async function fetchShopify(feedUrl: string, preferredCurrency?: string): Promise<{ products: Product[]; siteName: string | null }> {
   const endpoint = shopifyProductsEndpoint(feedUrl);
   const [meta, listed] = await Promise.all([shopifyMeta(feedUrl), shopifyListedHandles(feedUrl)]);
+  // Ask for the visitor's currency (the store's own price there, not a conversion)
+  // or else the store's home currency, then label prices with whatever it actually uses.
+  const currency = await shopifyPricingCurrency(feedUrl, preferredCurrency ?? meta.currency);
   const products: Product[] = [];
   for (let page = 1; page <= 6; page++) {
-    // Stores using Shopify Markets price in the *visitor's* currency, guessed from
-    // where the request comes from (our servers are in the US), while meta.json
-    // gives the store's own. Ask for that one explicitly so the label is right.
-    const currencyParam = meta.currency ? `&currency=${encodeURIComponent(meta.currency)}` : "";
+    const currencyParam = currency ? `&currency=${encodeURIComponent(currency)}` : "";
     const res = await safeFetchJson(`${endpoint}?limit=250&page=${page}${currencyParam}`);
     const raw = (res?.data as { products?: unknown[] })?.products;
     if (!Array.isArray(raw)) {
@@ -118,7 +133,7 @@ export async function fetchShopify(feedUrl: string): Promise<{ products: Product
     // Stop on an empty page, not a short one: Shopify sometimes returns 249 of 250
     // with more pages still to come (Onyx's retail blends were on page 2).
     if (raw.length === 0) break;
-    products.push(...parseShopify(res!.data, feedUrl, meta.currency, listed));
+    products.push(...parseShopify(res!.data, feedUrl, currency, listed));
   }
   return { products, siteName: meta.name };
 }

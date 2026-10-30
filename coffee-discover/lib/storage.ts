@@ -11,6 +11,8 @@ export interface SavedRoaster {
   addedAt: number;
   /** Hex color used to tag this roaster's coffees. */
   color?: string;
+  /** Bag size to assume when the store doesn't list one (set by the visitor). */
+  usualBagGrams?: number;
 }
 
 export type SortMode = "newest" | "price-asc" | "price-desc" | "per-cup" | "roaster";

@@ -10,7 +10,7 @@ const urls = (process.env.LIVE_URLS ?? "").split(",").filter(Boolean);
 
 describe.skipIf(urls.length === 0)("live stores", () => {
   it.each(urls)("%s", async (url) => {
-    const feed = await detectFeed(url);
+    const feed = await detectFeed(url, { currency: process.env.LIVE_CURRENCY || undefined });
     const inStock = feed.products.filter((p) => p.available);
     console.log(
       `\n### ${url}\n  platform=${feed.source.platform} feedUrl=${feed.source.feedUrl} name=${JSON.stringify(feed.siteName)}` +
