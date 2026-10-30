@@ -11,6 +11,7 @@ import {
 } from "@/lib/storage";
 import { AddRoasterForm } from "./AddRoasterForm";
 import { Dialog } from "./Dialog";
+import { LinkPreview } from "./LinkPreview";
 import { ManageRoasters } from "./ManageRoasters";
 import { ProductCard, SkeletonCard } from "./ProductCard";
 
@@ -51,7 +52,8 @@ export function Feed() {
   const [storageOk, setStorageOk] = useState(true);
   const [query, setQuery] = useState("");
   const [roasterFilter, setRoasterFilter] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<"add" | "manage" | null>(null);
+  const [dialog, setDialog] = useState<"add" | "manage" | "link" | null>(null);
+  const [linkPreview, setLinkPreview] = useState<{ incoming: SharedRoaster[]; already: SharedRoaster[] } | null>(null);
   const [linkImport, setLinkImport] = useState<LinkImport | null>(null);
   const [lastHidden, setLastHidden] = useState<string | null>(null);
   const [chipsOpen, setChipsOpen] = useState(false);
@@ -141,13 +143,16 @@ export function Feed() {
       return;
     }
     const following = stateRef.current.roasters;
-    const incoming = shared.filter((e) => !following.some((r) => sameRoasterUrl(r.feedUrl, e.url)));
+    const isFollowed = (e: SharedRoaster) => following.some((r) => sameRoasterUrl(r.feedUrl, e.url));
+    const incoming = shared.filter((e) => !isFollowed(e));
     if (incoming.length === 0) {
       setShareNote(`You already follow ${shared.length === 1 ? "the roaster" : `all ${shared.length} roasters`} in that link.`);
       return;
     }
-    importShared(incoming, shared.length - incoming.length);
-  }, [importShared]);
+    // Show the whole list and let the visitor choose before anything is added.
+    setLinkPreview({ incoming, already: shared.filter(isFollowed) });
+    setDialog("link");
+  }, []);
 
   const refreshMany = useCallback(async (roasters: SavedRoaster[]) => {
     const queue = [...roasters];
@@ -424,6 +429,21 @@ export function Feed() {
           </>
         )}
       </main>
+
+      <Dialog open={dialog === "link"} onClose={() => { setDialog(null); setLinkPreview(null); }} title="Roasters from this link">
+        {linkPreview && (
+          <LinkPreview
+            incoming={linkPreview.incoming}
+            already={linkPreview.already}
+            onCancel={() => { setDialog(null); setLinkPreview(null); }}
+            onFollow={(selected) => {
+              setDialog(null);
+              setLinkPreview(null);
+              importShared(selected, 0);
+            }}
+          />
+        )}
+      </Dialog>
 
       <Dialog open={dialog === "add"} onClose={() => setDialog(null)} title="Follow a roaster">
         <AddRoasterForm onAdd={addRoaster} autoFocus />
