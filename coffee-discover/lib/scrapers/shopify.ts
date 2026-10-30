@@ -1,4 +1,4 @@
-import { keepCoffee, noteSkipped, searchTextFor } from "./filter";
+import { keepCoffee, noteSkipped, searchTextFor, titleSaysCoffee } from "./filter";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
 import { absoluteUrl, pickBag, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
@@ -27,7 +27,11 @@ export function shopifyProductsEndpoint(feedUrl: string): string {
 
 /**
  * @param listed handles in the store's sitemap. Shops keep wholesale, café-only,
- *   partner and other private products out of it, so anything missing is left out.
+ *   partner and other private products out of it, but also hide some public
+ *   coffees from search engines (Regalia's Vinka lots), and new products can be
+ *   missing while the sitemap catches up. So a product missing from it is only
+ *   left out when its name gives no sign of being coffee ("Onyx Likes You",
+ *   "IO-E-23"), not when it does ("Vinka Washed Sidra").
  */
 export function parseShopify(data: unknown, feedUrl: string, currency: string | null = null, listed: Set<string> | null = null): Product[] {
   const list = (data as { products?: ShopifyProduct[] })?.products;
@@ -45,7 +49,7 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
     ].filter((o) => o && o !== "Title" && o !== "Default Title");
     const signals = { title, productType: p.product_type, tags, vendor: p.vendor, description: stripHtml(p.body_html), options };
     if (!keepCoffee(signals)) continue;
-    if (listed && !listed.has(p.handle)) {
+    if (listed && !listed.has(p.handle) && !titleSaysCoffee(title)) {
       noteSkipped(title);
       continue;
     }

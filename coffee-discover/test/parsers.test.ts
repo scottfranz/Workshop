@@ -187,9 +187,16 @@ describe("coffee filter", () => {
 });
 
 describe("shopify sitemap", () => {
-  it("leaves out products the store keeps out of its sitemap", () => {
-    const products = parseShopify(fx.shopifyProducts, "https://r.example", "USD", new Set(["colombia-decaf"]));
-    expect(products.map((p) => p.title)).toEqual(["Colombia Decaf"]);
+  it("leaves out unlisted products only when the name doesn't say coffee", () => {
+    const base = fx.shopifyProducts.products[0];
+    const data = { products: [
+      { ...base, id: 1, handle: "vinka", title: "Vinka Washed Sidra" },      // hidden from search, but clearly coffee
+      { ...base, id: 2, handle: "likes-you", title: "Onyx Likes You" },      // private partner product
+      { ...base, id: 3, handle: "io-e-23", title: "IO-E-23" },               // internal code
+      { ...base, id: 4, handle: "listed", title: "Big Trouble" },            // in the sitemap: kept
+    ] };
+    const products = parseShopify(data, "https://r.example", "USD", new Set(["listed"]));
+    expect(products.map((p) => p.title)).toEqual(["Vinka Washed Sidra", "Big Trouble"]);
   });
   it("filters nothing when the sitemap couldn't be read", () => {
     expect(parseShopify(fx.shopifyProducts, "https://r.example", "USD", null)).toHaveLength(2);
