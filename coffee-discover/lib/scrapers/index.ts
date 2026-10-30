@@ -6,7 +6,7 @@ import { fetchShopify, parseShopify, shopifyMeta, shopifyProductsEndpoint } from
 import {
   SQUARESPACE_SHOP_GUESSES, fetchSquarespace, isSquarespaceProductPage, parseSquarespace, siteTitle, withFormatJson,
 } from "./squarespace";
-import { preferLatin } from "./text";
+import { CJK, preferLatin } from "./text";
 import type { FeedSource, Platform, Product, RoasterFeed } from "./types";
 import { fetchWooCommerce, parseWooCommerce, wooEndpoint } from "./woocommerce";
 
@@ -25,11 +25,34 @@ export function normalizeUrl(raw: string): string {
   return u.toString().replace(/\/$/, "");
 }
 
+const comparable = (title: string) => preferLatin(title).toLowerCase().replace(/\bscaj\b/g, "").replace(/[^a-z0-9]+/g, "");
+const imageKey = (src: string | null) => (src ? src.replace(/^https?:/, "").split("?")[0] : null);
+
+/**
+ * Some roasters list the same coffee twice: once in English and once with a
+ * bilingual (e.g. English + Japanese) title for another market. Drop the
+ * bilingual copy when an English-only listing has the same name or photo.
+ */
+export function dropBilingualDuplicates(products: Product[]): Product[] {
+  const latin = products.filter((p) => !CJK.test(p.title));
+  if (latin.length === 0 || latin.length === products.length) return products;
+  const names = latin.map((p) => comparable(p.title)).filter((n) => n.length >= 4);
+  const images = new Set(latin.map((p) => imageKey(p.image)).filter(Boolean));
+  return products.filter((p) => {
+    if (!CJK.test(p.title)) return true;
+    const name = comparable(p.title);
+    if (images.has(imageKey(p.image))) return false;
+    return !names.some((n) => n === name || (name.length >= 6 && (n.includes(name) || name.includes(n))));
+  });
+}
+
 function finish(source: FeedSource, siteName: string | null, products: Product[]): RoasterFeed {
   return {
     source,
     siteName,
-    products: products.slice(0, MAX_PRODUCTS).map((p) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
+    products: dropBilingualDuplicates(products)
+      .slice(0, MAX_PRODUCTS)
+      .map((p) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
   };
 }
 

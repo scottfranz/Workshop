@@ -180,3 +180,29 @@ describe("bilingual text", () => {
     expect(preferLatin(input)).toBe(expected);
   });
 });
+
+describe("bilingual duplicates", () => {
+  const p = (id: string, title: string, image: string | null = null) => ({
+    id, title, url: `https://r.example/${id}`, image, price: 20, currency: "USD", available: true, publishedAt: null, description: null,
+  });
+
+  it("keeps the English listing and drops its bilingual twin", async () => {
+    const { dropBilingualDuplicates } = await import("@/lib/scrapers");
+    const out = dropBilingualDuplicates([
+      p("1", "SCAJ - El Espejo"),
+      p("2", "SCAJ - El Espejo. フィンカ・エル・エスペホ"),
+      p("3", "Fabio Caballero La Salvaje Washed Gesha"),
+      p("4", "SCAJ - Fabio Caballero COE Washed Gesha ラ•サルバヘ. ウォッシュド. ゲシャ", "https://cdn.shopify.com/a.jpg?v=2"),
+      p("5", "Red Honey Sidra", "https://cdn.shopify.com/a.jpg?v=1"),
+      p("6", "SCAJ - Vinka Washed Sidra ヴィンカ. ウォッシュド. シドラ"),
+    ]);
+    // 2 matches by name, 4 matches 5 by photo; 6 has no English twin so it stays.
+    expect(out.map((x) => x.id)).toEqual(["1", "3", "5", "6"]);
+  });
+
+  it("leaves Japanese-only roasters alone", async () => {
+    const { dropBilingualDuplicates } = await import("@/lib/scrapers");
+    const list = [p("1", "エチオピア グジ"), p("2", "ケニア")];
+    expect(dropBilingualDuplicates(list)).toBe(list);
+  });
+});

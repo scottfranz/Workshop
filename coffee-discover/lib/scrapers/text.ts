@@ -68,7 +68,7 @@ export function toIso(v: unknown): string | null {
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
 
-const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uff66-\uff9f]/;
+export const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uff66-\uff9f]/;
 
 /**
  * Some roasters write bilingual titles, e.g. "SCAJ - El Espejo. フィンカ・エル・エスペホ".
