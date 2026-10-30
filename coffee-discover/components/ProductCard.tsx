@@ -7,13 +7,14 @@ export function ProductCard({ item, onHide, onRoaster }: { item: FeedItem; onHid
   const image = sizedImage(item.image);
   return (
     <article className={`card${item.available ? "" : " sold-out"}`}>
-      <div className="card-img">
+      {/* The title link is the accessible one; this duplicate just makes the photo clickable. */}
+      <a className="card-img" href={item.url} target="_blank" rel="noopener noreferrer" tabIndex={-1} aria-hidden="true">
         {image ? (
           <img src={image} alt="" loading="lazy" decoding="async" referrerPolicy="no-referrer" />
         ) : (
           <BagPlaceholder />
         )}
-      </div>
+      </a>
       {!item.available ? <span className="badge sold">Sold out</span> : item.isNew && <span className="badge">New</span>}
       <button type="button" className="card-hide" onClick={onHide} aria-label={`Hide ${item.title}`} title="Hide this coffee">×</button>
       <div className="card-body">

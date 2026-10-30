@@ -5,6 +5,7 @@ import { fetchShopify, parseShopify, shopifyMeta, shopifyProductsEndpoint } from
 import {
   SQUARESPACE_SHOP_GUESSES, fetchSquarespace, isSquarespaceProductPage, parseSquarespace, siteTitle, withFormatJson,
 } from "./squarespace";
+import { preferLatin } from "./text";
 import type { FeedSource, Platform, Product, RoasterFeed } from "./types";
 import { fetchWooCommerce, parseWooCommerce, wooEndpoint } from "./woocommerce";
 
@@ -24,7 +25,11 @@ export function normalizeUrl(raw: string): string {
 }
 
 function finish(source: FeedSource, siteName: string | null, products: Product[]): RoasterFeed {
-  return { source, siteName, products: products.slice(0, MAX_PRODUCTS) };
+  return {
+    source,
+    siteName,
+    products: products.slice(0, MAX_PRODUCTS).map((p) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
+  };
 }
 
 /** Read a roaster whose platform we already know. */
@@ -111,6 +116,13 @@ export async function detectFeed(rawUrl: string): Promise<RoasterFeed> {
   if (page.status >= 400) throw new FetchError(`The site returned an error (${page.status}). Is the link right?`, page.status);
   const html = page.body;
 
+  // The page is Shopify but /products.json didn't answer the first time. That's
+  // usually a momentary block or rate limit, so try once more before falling back.
+  if (isShopifyHtml(html)) {
+    const retry = await fetchShopify(url).catch(() => null);
+    if (retry && retry.products.length > 0) return finish({ platform: "shopify", feedUrl: url }, retry.siteName, retry.products);
+  }
+
   if (isSquarespaceHtml(html)) {
     const sqs = await detectSquarespace(url, html);
     if (sqs) return sqs;
@@ -120,7 +132,7 @@ export async function detectFeed(rawUrl: string): Promise<RoasterFeed> {
   const generic = await fetchJsonLd(url, html);
   if (generic.products.length > 0) return finish({ platform: "jsonld", feedUrl: url }, generic.siteName, generic.products);
 
-  if (isShopifyHtml(html)) throw new FetchError("This Shopify store has its product feed turned off, so we can't read it.");
+  if (isShopifyHtml(html)) throw new FetchError("This Shopify store didn't share its product list just now. Try again in a minute.");
   throw new FetchError(
     "We couldn't find any coffees on that page. Try pasting the link to the roaster's shop or coffee page instead of the homepage.",
   );

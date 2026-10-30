@@ -142,3 +142,17 @@ describe("json-ld aggregate availability", () => {
     expect(products[0]).toMatchObject({ available: false, currency: "USD", price: 20 });
   });
 });
+
+describe("bilingual text", () => {
+  it.each([
+    ["SCAJ - El Espejo. フィンカ・エル・エスペホ", "SCAJ - El Espejo"],
+    ["SCAJ - Fabio Caballero COE Washed Gesha ラ•サルバヘ. ウォッシュド. ゲシャ", "SCAJ - Fabio Caballero COE Washed Gesha"],
+    ["SCAJ - Red Honey Sidra. ヴィンカ　レッドハニー　シドラ", "SCAJ - Red Honey Sidra"],
+    ["mulled wine, pineapple juice, nectarine テイスティングノート: マルドワイン、パイナップル", "mulled wine, pineapple juice, nectarine"],
+    ["エチオピア グジ", "エチオピア グジ"],
+    ["Ethiopia Guji", "Ethiopia Guji"],
+  ])("%s", async (input, expected) => {
+    const { preferLatin } = await import("@/lib/scrapers/text");
+    expect(preferLatin(input)).toBe(expected);
+  });
+});

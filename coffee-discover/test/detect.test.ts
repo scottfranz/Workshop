@@ -99,6 +99,33 @@ describe("detectFeed", () => {
   });
 });
 
+describe("resilience", () => {
+  it("retries a Shopify store whose products.json hiccupped", async () => {
+    let attempts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: URL | string) => {
+      const url = String(input);
+      if (url.startsWith("https://flaky.example/products.json")) {
+        attempts++;
+        return attempts <= 2
+          ? new Response("slow down", { status: 429 })
+          : new Response(JSON.stringify(fx.shopifyProducts), { headers: { "content-type": "application/json" } });
+      }
+      if (url === "https://flaky.example/") return new Response('<script src="//cdn.shopify.com/x.js"></script>', { headers: { "content-type": "text/html" } });
+      return new Response("nope", { status: 404 });
+    }));
+    const feed = await detectFeed("flaky.example");
+    expect(feed.source.platform).toBe("shopify");
+    expect(feed.products).toHaveLength(2);
+  });
+
+  it("cleans bilingual titles in the final feed", async () => {
+    mockSite({
+      "https://jp.example/products.json?limit=250": { body: { products: [{ ...fx.shopifyProducts.products[0], title: "SCAJ - El Espejo. フィンカ・エル・エスペホ" }] } },
+    });
+    expect((await detectFeed("jp.example")).products[0].title).toBe("SCAJ - El Espejo");
+  });
+});
+
 describe("url safety", () => {
   it.each(["127.0.0.1", "10.2.3.4", "172.20.0.1", "192.168.1.1", "169.254.169.254", "100.64.0.1", "::1", "fd00::1", "::ffff:10.0.0.1"])(
     "%s is private", (ip) => expect(isPrivateAddress(ip)).toBe(true),

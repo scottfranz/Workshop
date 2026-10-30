@@ -85,7 +85,22 @@ export interface FetchedText {
   body: string;
 }
 
+const TRANSIENT = new Set([429, 500, 502, 503, 504]);
+const RETRY_DELAY_MS = 800;
+
+/** Like safeFetchTextOnce, but retries once on rate limits, server errors and dropped connections. */
 export async function safeFetchText(raw: string, accept = "application/json, text/html;q=0.9, */*;q=0.5"): Promise<FetchedText> {
+  try {
+    const res = await safeFetchTextOnce(raw, accept);
+    if (!TRANSIENT.has(res.status)) return res;
+  } catch (err) {
+    if (err instanceof FetchError && !/connect|too long/i.test(err.message)) throw err;
+  }
+  await new Promise((r) => setTimeout(r, RETRY_DELAY_MS));
+  return safeFetchTextOnce(raw, accept);
+}
+
+async function safeFetchTextOnce(raw: string, accept: string): Promise<FetchedText> {
   let current = raw;
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
     const url = await assertPublicUrl(current);

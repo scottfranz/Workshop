@@ -107,7 +107,7 @@ button, input, select { font: inherit; color: inherit; }
 .card { position: relative; display: flex; flex-direction: column; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); transition: transform 0.15s ease; }
 .card:hover { transform: translateY(-2px); }
 .card.sold-out .card-img img { filter: grayscale(0.7); opacity: 0.7; }
-.card-img { aspect-ratio: 1; background: var(--surface-2); overflow: hidden; }
+.card-img { display: block; aspect-ratio: 1; background: var(--surface-2); overflow: hidden; }
 .card-img img { width: 100%; height: 100%; object-fit: cover; }
 .card-body { display: flex; flex-direction: column; gap: 4px; padding: 10px 12px 12px; flex: 1; }
 .card-roaster { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--accent); background: none; border: 0; padding: 0; text-align: left; cursor: pointer; }
