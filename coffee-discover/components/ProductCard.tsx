@@ -69,11 +69,10 @@ export function ProductCard({ item, color, view, onHide, onRoaster }: Props) {
 
 function BagPlaceholder() {
   return (
-    <svg viewBox="0 0 100 100" width="100%" height="100%" aria-hidden="true">
-      <rect width="100" height="100" fill="color-mix(in srgb, var(--rc, var(--ink-3)) 14%, var(--surface-2))" />
-      <path d="M32 24h36l4 10v42a6 6 0 0 1-6 6H34a6 6 0 0 1-6-6V34z" fill="color-mix(in srgb, var(--rc, var(--ink-3)) 30%, var(--surface))" />
-      <path d="M28 34h44" stroke="var(--rc, var(--ink-3))" strokeWidth="2" opacity="0.5" />
-      <ellipse cx="50" cy="58" rx="7" ry="10" transform="rotate(25 50 58)" fill="var(--rc, var(--ink-3))" opacity="0.55" />
+    <svg viewBox="0 0 100 125" width="100%" height="100%" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+      <rect width="100" height="125" fill="var(--fill)" />
+      <path d="M38 44h24l3 7v28a3 3 0 0 1-3 3H38a3 3 0 0 1-3-3V51z" fill="none" stroke="var(--fg-3)" strokeWidth="1.2" />
+      <path d="M35 51h30" stroke="var(--fg-3)" strokeWidth="1.2" />
     </svg>
   );
 }

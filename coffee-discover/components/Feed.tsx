@@ -44,6 +44,9 @@ export function Feed() {
   const [dialog, setDialog] = useState<"add" | "manage" | null>(null);
   const [pendingImport, setPendingImport] = useState<Omit<SavedRoaster, "addedAt">[] | null>(null);
   const [lastHidden, setLastHidden] = useState<string | null>(null);
+  const [chipsOpen, setChipsOpen] = useState(false);
+  const [hiddenChips, setHiddenChips] = useState(0);
+  const barRef = useRef<HTMLElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
 
@@ -100,6 +103,28 @@ export function Feed() {
     const ids = new Set(state.roasters.map((r) => r.id));
     saveCache(Object.fromEntries(Object.entries(cache).filter(([id]) => ids.has(id))));
   }, [cache, state.roasters, ready]);
+
+  // Roasters wrap onto at most two rows until expanded. Chips past that are
+  // counted for the "+N more" button and hidden from focus.
+  useEffect(() => {
+    const bar = barRef.current;
+    if (!bar) return;
+    const measure = () => {
+      const limit = bar.clientHeight;
+      let hidden = 0;
+      for (const chip of Array.from(bar.children) as HTMLElement[]) {
+        const over = !chipsOpen && chip.offsetTop >= limit;
+        chip.toggleAttribute("data-overflow", over);
+        chip.toggleAttribute("inert", over);
+        if (over) hidden++;
+      }
+      setHiddenChips(hidden);
+    };
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(bar);
+    return () => observer.disconnect();
+  }, [chipsOpen, state.roasters, ready]);
 
   // ── Actions ───────────────────────────────────────────────────────────────
   async function addRoaster(url: string, name?: string) {
@@ -167,20 +192,17 @@ export function Feed() {
     <>
       <header className="site-header">
         <div className="wrap">
-          <a className="brand" href="/">
-            <img className="brand-mark" src="/icon.svg" alt="" />
-            {SITE_NAME}
-          </a>
+          <a className="brand" href="/">{SITE_NAME}</a>
           {ready && state.roasters.length > 0 && (
             <div className="header-actions">
-              <button type="button" className="btn btn-ghost" onClick={() => refreshMany(state.roasters)} disabled={anyLoading} aria-label="Check for new coffees">
-                <span aria-hidden="true">↻</span><span className="hide-sm">{anyLoading ? "Checking…" : "Refresh"}</span>
+              <button type="button" className="btn btn-ghost hide-sm" onClick={() => refreshMany(state.roasters)} disabled={anyLoading} aria-label="Check for new coffees">
+                {anyLoading ? "Checking…" : "Refresh"}
               </button>
               <button type="button" className="btn" onClick={() => setDialog("manage")}>
-                Roasters <span className="hide-sm">({state.roasters.length})</span>
+                Roasters <span className="count">{state.roasters.length}</span>
               </button>
               <button type="button" className="btn btn-primary" onClick={() => setDialog("add")} aria-label="Follow a roaster">
-                + <span className="hide-sm" aria-hidden="true">Follow</span>
+                Follow
               </button>
             </div>
           )}
@@ -206,10 +228,12 @@ export function Feed() {
           <Welcome onAdd={addRoaster} />
         ) : (
           <>
-            <nav className="roaster-bar" aria-label="Filter by roaster">
-              <button type="button" className="chip" aria-pressed={roasterFilter === null} onClick={() => setRoasterFilter(null)}>
-                All <span className="chip-count">{countFor(null)}</span>
-              </button>
+            <nav ref={barRef} className={`roaster-bar${chipsOpen ? "" : " collapsed"}`} aria-label="Filter by roaster">
+              <span className={`chip-group${roasterFilter === null ? " active" : ""}`}>
+                <button type="button" className="chip" aria-pressed={roasterFilter === null} onClick={() => setRoasterFilter(null)}>
+                  All <span className="chip-count">{countFor(null)}</span>
+                </button>
+              </span>
               {state.roasters.map((r) => {
                 const s = status[r.id]?.state;
                 const active = roasterFilter === r.id;
@@ -226,6 +250,11 @@ export function Feed() {
                 );
               })}
             </nav>
+            {(hiddenChips > 0 || chipsOpen) && (
+              <button type="button" className="text-btn more-roasters" aria-expanded={chipsOpen} onClick={() => setChipsOpen((o) => !o)}>
+                {chipsOpen ? "Show fewer" : `+${hiddenChips} more`}
+              </button>
+            )}
 
             <div className="toolbar">
               <label className="sr-only" htmlFor="search">Search coffees</label>
@@ -240,7 +269,7 @@ export function Feed() {
               <div className="segmented" role="group" aria-label="Layout">
                 {(["grid", "list"] as ViewMode[]).map((v) => (
                   <button key={v} type="button" aria-pressed={state.prefs.view === v} onClick={() => setPref("view", v)} title={v === "grid" ? "Grid" : "List"}>
-                    <span aria-hidden="true">{v === "grid" ? "▦" : "☰"}</span><span className="sr-only">{v === "grid" ? "Grid view" : "List view"}</span>
+                    {v === "grid" ? "Grid" : "List"}<span className="sr-only"> view</span>
                   </button>
                 ))}
               </div>
@@ -324,23 +353,19 @@ function Welcome({ onAdd }: { onAdd: (url: string, name?: string) => Promise<voi
 
   return (
     <section className="welcome">
-      <h1>Fresh coffees from roasters you love.</h1>
-      <p>Follow a few roasters and new bags show up here as soon as they land in their shops. No account needed.</p>
+      <h1>New coffee from the roasters you follow.</h1>
+      <p>Paste a roaster&apos;s website. Their coffees show up here, newest first.</p>
       <AddRoasterForm onAdd={onAdd} compact />
-      <p className="hint" style={{ fontSize: 14, margin: "20px 0 0" }}>Or start with one of these:</p>
       <div className="suggestions">
+        <span className="muted">Try</span>
         {SUGGESTED_ROASTERS.map((s) => (
-          <button key={s.url} type="button" className="chip" disabled={adding !== null} onClick={() => quickAdd(s.name, s.url)}>
-            {adding === s.url ? "Adding…" : `+ ${s.name}`}
+          <button key={s.url} type="button" className="text-btn" disabled={adding !== null} onClick={() => quickAdd(s.name, s.url)}>
+            {adding === s.url ? "Adding…" : s.name}
           </button>
         ))}
       </div>
       <div aria-live="polite">{error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}</div>
-      <ul className="privacy-points">
-        <li><strong>No sign-up</strong>Nothing to create, nothing to remember.</li>
-        <li><strong>Stays on your device</strong>Your roasters are saved in this browser only.</li>
-        <li><strong>No tracking</strong>No cookies, analytics or ads. Ever.</li>
-      </ul>
+      <p className="welcome-note">No account. Your list is saved in this browser. Nothing is tracked.</p>
     </section>
   );
 }

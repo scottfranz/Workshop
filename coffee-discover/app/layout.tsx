@@ -16,8 +16,8 @@ export const viewport: Viewport = {
   width: "device-width",
   initialScale: 1,
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#f7f3ec" },
-    { media: "(prefers-color-scheme: dark)", color: "#17120e" },
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#0f0f0f" },
   ],
 };
 
@@ -28,8 +28,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         {children}
         <footer className="site-footer">
           <div className="wrap">
-            <span>{SITE_NAME} · No accounts. No cookies. No tracking.</span>
-            <Link href="/about">How it works &amp; privacy</Link>
+            <span>{SITE_NAME}. No accounts, no cookies, no tracking.</span>
+            <Link href="/about">How it works</Link>
           </div>
         </footer>
       </body>
