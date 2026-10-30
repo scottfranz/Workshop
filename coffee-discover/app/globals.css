@@ -82,6 +82,14 @@ button, input, select { font: inherit; color: inherit; }
 .roaster-bar { display: flex; gap: 8px; overflow-x: auto; padding: 14px 0 6px; scrollbar-width: thin; }
 .chip { flex: none; display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--surface); cursor: pointer; font-size: 14px; }
 .chip[aria-pressed="true"] { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+/* A roaster chip: filter button + remove button sharing one pill, like the old app. */
+.chip-group { flex: none; display: inline-flex; align-items: stretch; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); overflow: hidden; }
+.chip-group .chip { border: 0; border-radius: 0; padding-right: 6px; background: transparent; }
+.chip-group.active { background: var(--ink); border-color: var(--ink); }
+.chip-group.active .chip { color: var(--bg); }
+.chip-remove { border: 0; background: transparent; color: var(--ink-3); cursor: pointer; padding: 0 12px 0 4px; font-size: 16px; line-height: 1; }
+.chip-remove:hover { color: var(--danger); }
+.chip-group.active .chip-remove { color: color-mix(in srgb, var(--bg) 70%, transparent); }
 .chip-count { font-size: 12px; opacity: 0.7; font-variant-numeric: tabular-nums; }
 .chip-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--rc, var(--ink-3)); }
 .chip[aria-pressed="true"] .chip-dot { box-shadow: 0 0 0 2px var(--bg); }
