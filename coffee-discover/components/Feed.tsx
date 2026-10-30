@@ -11,17 +11,12 @@ import {
 } from "@/lib/storage";
 import { AddRoasterForm } from "./AddRoasterForm";
 import { Dialog } from "./Dialog";
-import { LinkPreview } from "./LinkPreview";
+import { LinkPreview, type PickedRoaster } from "./LinkPreview";
 import { ManageRoasters } from "./ManageRoasters";
 import { ProductCard, SkeletonCard } from "./ProductCard";
 
 interface LinkImport {
-  total: number;
-  done: number;
   added: string[];
-  failed: string[];
-  alreadyFollowing: number;
-  running: boolean;
 }
 
 export type RoasterStatus = { state: "loading" } | { state: "ok" } | { state: "error"; message: string };
@@ -53,7 +48,7 @@ export function Feed() {
   const [query, setQuery] = useState("");
   const [roasterFilter, setRoasterFilter] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"add" | "manage" | "link" | null>(null);
-  const [linkPreview, setLinkPreview] = useState<{ incoming: SharedRoaster[]; already: SharedRoaster[] } | null>(null);
+  const [linkPreview, setLinkPreview] = useState<{ incoming: SharedRoaster[]; alreadyNames: string[] } | null>(null);
   const [linkImport, setLinkImport] = useState<LinkImport | null>(null);
   const [lastHidden, setLastHidden] = useState<string | null>(null);
   const [chipsOpen, setChipsOpen] = useState(false);
@@ -105,30 +100,21 @@ export function Feed() {
     return true;
   }, []);
 
-  /** Follow everything in a share link right away; the banner offers Undo. */
-  const importShared = useCallback(async (entries: SharedRoaster[], alreadyFollowing: number) => {
-    const result: LinkImport = { total: entries.length, done: 0, added: [], failed: [], alreadyFollowing, running: true };
-    setLinkImport({ ...result });
-    const queue = [...entries];
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
-      for (let e = queue.shift(); e; e = queue.shift()) {
-        try {
-          // Old links carry name and platform; new ones are just addresses, so detect.
-          const feed = await requestFeed(e.platform ? { url: e.url, platform: e.platform } : { url: e.url });
-          if (feed.products.length === 0) throw new Error("no coffees");
-          const id = feed.source.feedUrl;
-          const roaster = { id, name: e.name || feed.siteName || hostName(id), platform: feed.source.platform, feedUrl: id, addedAt: Date.now() };
-          if (adopt(roaster, feed)) result.added.push(id);
-          else result.alreadyFollowing++;
-        } catch {
-          result.failed.push(hostName(e.url));
-        }
-        result.done++;
-        setLinkImport({ ...result });
-      }
-    }));
-    result.running = false;
-    setLinkImport({ ...result });
+  /** Look up a roaster from a share link (old links already know the platform). */
+  const lookupShared = useCallback(
+    (e: SharedRoaster) => requestFeed(e.platform ? { url: e.url, platform: e.platform } : { url: e.url }),
+    [],
+  );
+
+  /** Save the roasters picked in the link preview; the banner offers Undo. */
+  const followPicked = useCallback((picked: PickedRoaster[]) => {
+    const added: string[] = [];
+    for (const { entry, feed } of picked) {
+      const id = feed.source.feedUrl;
+      const roaster = { id, name: entry.name || feed.siteName || hostName(id), platform: feed.source.platform, feedUrl: id, addedAt: Date.now() };
+      if (adopt(roaster, feed)) added.push(id);
+    }
+    setLinkImport({ added });
   }, [adopt]);
 
   const readShareLink = useCallback(() => {
@@ -150,7 +136,8 @@ export function Feed() {
       return;
     }
     // Show the whole list and let the visitor choose before anything is added.
-    setLinkPreview({ incoming, already: shared.filter(isFollowed) });
+    const alreadyNames = shared.flatMap((e) => following.find((r) => sameRoasterUrl(r.feedUrl, e.url))?.name ?? []);
+    setLinkPreview({ incoming, alreadyNames });
     setDialog("link");
   }, []);
 
@@ -318,23 +305,13 @@ export function Feed() {
 
         {linkImport && (
           <div className="banner" role="status">
-            {linkImport.running ? (
-              <span>Adding roasters from your link… {linkImport.done} of {linkImport.total}</span>
-            ) : (
-              <span>
-                {linkImport.added.length > 0
-                  ? <><strong>Added {linkImport.added.length} roaster{linkImport.added.length === 1 ? "" : "s"}</strong> from your link.</>
-                  : "No new roasters were added."}
-                {linkImport.alreadyFollowing > 0 && ` ${linkImport.alreadyFollowing} you already follow${linkImport.alreadyFollowing === 1 ? "s" : ""}.`}
-                {linkImport.failed.length > 0 && ` Couldn't reach ${linkImport.failed.join(", ")}.`}
-              </span>
-            )}
-            {!linkImport.running && linkImport.added.length > 0 && (
-              <button type="button" className="btn" onClick={undoImport}>Undo</button>
-            )}
-            {!linkImport.running && (
-              <button type="button" className="btn btn-ghost" style={{ marginLeft: linkImport.added.length ? 0 : undefined }} onClick={() => setLinkImport(null)}>OK</button>
-            )}
+            <span>
+              {linkImport.added.length > 0
+                ? <><strong>Added {linkImport.added.length} roaster{linkImport.added.length === 1 ? "" : "s"}</strong> from the link.</>
+                : "No new roasters were added."}
+            </span>
+            {linkImport.added.length > 0 && <button type="button" className="btn" onClick={undoImport}>Undo</button>}
+            <button type="button" className="btn btn-ghost" style={{ marginLeft: linkImport.added.length ? 0 : undefined }} onClick={() => setLinkImport(null)}>OK</button>
           </div>
         )}
 
@@ -434,12 +411,14 @@ export function Feed() {
         {linkPreview && (
           <LinkPreview
             incoming={linkPreview.incoming}
-            already={linkPreview.already}
+            alreadyNames={linkPreview.alreadyNames}
+            firstVisit={state.roasters.length === 0}
+            lookup={lookupShared}
             onCancel={() => { setDialog(null); setLinkPreview(null); }}
-            onFollow={(selected) => {
+            onFollow={(picked) => {
               setDialog(null);
               setLinkPreview(null);
-              importShared(selected, 0);
+              followPicked(picked);
             }}
           />
         )}
