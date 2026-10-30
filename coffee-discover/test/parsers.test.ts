@@ -138,6 +138,16 @@ describe("coffee filter", () => {
     ["Rainbow Hopper Easy Sub", { options: ["12oz"] }],
     ["Monarch - Cometeer", { productType: "Coffee" }],
     ["Salted Mocha RTD", {}],
+    ["Panama Kotowa Las Brujas Washed - Cafe Only", { productType: "Coffee" }],
+    ["Smiley Coffee Ludlow Blend - 10oz Case Pack", { productType: "Coffee" }],
+    ["Curio", { productType: "Coffee", tags: ["coffee", "type:collaboration", "white-label"] }],
+    ["Costa Rica Volcan Azul SL28", { productType: "Coffee", tags: ["coffee", "utility-sku"] }],
+    ["Ethiopia Guji", { productType: "Coffee", vendor: "Onyx Coffee Lab (WHOLESALE)" }],
+    ["70% Tanzania | Dark & Lemon Crunch", { productType: "Chocolate", tags: ["chocolate"] }],
+    ["Dark Chocolate Covered Espresso Beans", { productType: "Terroir" }],
+    ["Golden Milk Latte Powder", {}],
+    ["Instant Geometry", { productType: "Coffee" }],
+    ["Decaf Espresso - Peru Norandino - Sample Only", {}],
   ])("drops %s", (title, extra) => {
     expect(coffee(title, extra)).toBe(false);
   });
@@ -154,6 +164,8 @@ describe("coffee filter", () => {
     ["SCAJ - El Espejo", { options: ["100g"] }],
     ["Holiday", { productType: "Coffee" }],
     ["Whole Bean Sampler", {}],
+    ["Kenya Kiambu", { productType: "Coffee", tags: ["coffee", "wholesale", "single origin"] }],
+    ["Geometry", { productType: "Coffee", tags: ["coffee", "type:blend", "wholesale-coffee"], options: ["10oz", "10oz Case Pack (6)"] }],
   ])("keeps %s", (title, extra) => {
     expect(coffee(title, extra)).toBe(true);
   });
@@ -161,6 +173,16 @@ describe("coffee filter", () => {
   it("trusts an explicit coffee product type but not a gear one", () => {
     expect(coffee("Server Room", { productType: "Coffee" })).toBe(true);
     expect(coffee("Ethiopia", { productType: "Merchandise" })).toBe(false);
+  });
+});
+
+describe("shopify sitemap", () => {
+  it("leaves out products the store keeps out of its sitemap", () => {
+    const products = parseShopify(fx.shopifyProducts, "https://r.example", "USD", new Set(["colombia-decaf"]));
+    expect(products.map((p) => p.title)).toEqual(["Colombia Decaf"]);
+  });
+  it("filters nothing when the sitemap couldn't be read", () => {
+    expect(parseShopify(fx.shopifyProducts, "https://r.example", "USD", null)).toHaveLength(2);
   });
 });
 

@@ -14,13 +14,17 @@ export interface ProductSignals {
   description?: string | null;
   /** Option names and values, variant titles, e.g. ["Size", "12oz", "Grind", "Whole Bean"]. */
   options?: string[];
+  /** Brand/vendor the store files the product under, e.g. "Onyx Coffee Lab (WHOLESALE)". */
+  vendor?: string | null;
 }
 
 // Words that mean "not a bag of coffee" wherever they appear in a title.
 const NON_COFFEE_TITLE = [
   // gift cards, subscriptions, services
   "gift card", "giftcard", "e-gift", "gift certificate", "subscription", "subscribe", "sub", "membership",
-  "class", "workshop", "ticket", "donation", "tip jar", "shipping protection", "route package", "wholesale inquiry",
+  "class", "workshop", "ticket", "donation", "tip jar", "shipping protection", "route package", "wholesale",
+  // not sold to the public: café, staff and partner products
+  "cafe only", "café only", "cafes only", "staff only", "employee", "case pack", "white label",
   // brewing gear
   "grinder", "dripper", "kettle", "scale", "filter", "filters", "carafe", "decanter", "brewer", "chemex", "aeropress",
   "v60", "kalita", "origami", "french press", "moka", "espresso machine", "tamper", "portafilter", "puck screen",
@@ -37,13 +41,14 @@ const NON_COFFEE_TITLE = [
   "book", "books", "atlas", "handbook", "magazine", "zine",
   // other drinks and food
   "capsule", "capsules", "pods", "nespresso", "cometeer", "rtd", "ready to drink", "concentrate", "syrup", "tea", "chai",
-  "matcha", "cocoa", "chocolate bar",
+  "matcha", "cocoa", "chocolate bar", "chocolate covered", "chocolate collection", "sipping chocolate", "drinking chocolate",
+  "hot chocolate", "powder", "toddy", "instant", "sample only",
 ];
 
 const NON_COFFEE_TYPE = [
   "merch", "apparel", "equipment", "gear", "accessor", "tool", "brewer", "brewing", "ware", "book", "water", "gift",
   "subscription", "tea", "kitchen", "supplies", "cleaning", "service", "class", "drink", "grinder", "machine",
-  "dripper", "kettle", "scale", "music", "vinyl", "record", "rtd", "capsule", "cometeer",
+  "dripper", "kettle", "scale", "music", "vinyl", "record", "rtd", "capsule", "cometeer", "chocolate", "cacao",
 ];
 
 const COFFEE_TYPE = ["coffee", "bean", "espresso", "single origin", "blend", "decaf", "green", "roast", "microlot", "sample"];
@@ -105,6 +110,11 @@ export function looksLikeCoffee(input: ProductSignals | string): boolean {
   if (type !== "" && NON_COFFEE_TYPE.some((w) => type.includes(w))) return false;
   const typeSaysCoffee = type !== "" && anyPhrase(type, COFFEE_TYPE);
   if (/(^|\|\s*)(merch|merchandise|gear|equipment|accessories|apparel|books?|water|tools?|brew gear)(\s*\||$)/.test(tags)) return false;
+  // Tags or vendor marking wholesale, café-only, partner or hidden products.
+  // Tags marking café-only, partner or hidden products. ("wholesale" alone isn't enough:
+  // many roasters tag retail coffees that way so they also appear in a wholesale portal.)
+  if (/(^|\|\s*)(white[- ]label|cafe[- ]only|café[- ]only|utility[- ]sku|private|unlisted|hidden)(\s*\||$)/.test(tags)) return false;
+  if (/wholesale/i.test(s.vendor ?? "")) return false;
 
   // Yes if anything positively says coffee.
   if (typeSaysCoffee) return true;
