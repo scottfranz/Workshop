@@ -140,33 +140,75 @@ export function pruneSeen(state: SavedState, now = Date.now()): SavedState {
 }
 
 // ── Share links ──────────────────────────────────────────────────────────────
-// A list can be moved to another device by link. It contains only roaster names
-// and URLs, encoded in the #fragment so it never reaches any server.
+// A list can be moved to another device by link. It holds only the roasters'
+// web addresses, in the #fragment so it never reaches any server:
+//   /#r=regaliacoffee.com,hex.coffee/collections/coffee,...
+// Platform and name are worked out again when the link is opened, which keeps
+// links short. Older links (#follow=<base64 JSON with names and platforms>)
+// still open.
 
-type SharedEntry = [name: string, platform: Platform, feedUrl: string];
-
-export function encodeShare(roasters: SavedRoaster[]): string {
-  const entries: SharedEntry[] = roasters.map((r) => [r.name, r.platform, r.feedUrl]);
-  const bytes = new TextEncoder().encode(JSON.stringify(entries));
-  let bin = "";
-  bytes.forEach((b) => (bin += String.fromCharCode(b)));
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+export interface SharedRoaster {
+  url: string;
+  /** Only present in old-style links. */
+  name?: string;
+  platform?: Platform;
 }
 
 const PLATFORMS: Platform[] = ["shopify", "woocommerce", "squarespace", "square", "bigcartel", "jsonld"];
+const MAX_SHARED = 200;
 
-export function decodeShare(encoded: string): Omit<SavedRoaster, "addedAt">[] {
+/** Compare roaster addresses loosely: scheme, "www.", case and trailing slash don't matter. */
+export function sameRoasterUrl(a: string, b: string): boolean {
+  const norm = (u: string) => u.toLowerCase().replace(/^https?:\/\//, "").replace(/^www\./, "").replace(/\/+$/, "");
+  return norm(a) === norm(b);
+}
+
+export function encodeShare(roasters: SavedRoaster[]): string {
+  return "r=" + roasters
+    .map((r) => encodeURIComponent(r.feedUrl.replace(/^https:\/\//, "")).replace(/%2F/gi, "/"))
+    .join(",");
+}
+
+/** Reads either link format from a location.hash (with or without the leading #). */
+export function decodeShare(hash: string): SharedRoaster[] {
+  const h = hash.replace(/^#/, "");
+  const compact = h.match(/(?:^|&)r=([^&]*)/);
+  if (compact) {
+    return compact[1].split(",").flatMap((part): SharedRoaster[] => {
+      try {
+        const raw = decodeURIComponent(part).trim();
+        if (!raw) return [];
+        const url = new URL(/^https?:\/\//.test(raw) ? raw : "https://" + raw);
+        return url.protocol === "https:" || url.protocol === "http:" ? [{ url: url.toString().replace(/\/$/, "") }] : [];
+      } catch {
+        return [];
+      }
+    }).slice(0, MAX_SHARED);
+  }
+  const legacy = h.match(/(?:^|&)follow=([^&]*)/);
+  if (legacy) return decodeLegacyShare(legacy[1]);
+  return [];
+}
+
+type LegacyEntry = [name: string, platform: Platform, feedUrl: string];
+
+function decodeLegacyShare(encoded: string): SharedRoaster[] {
   try {
     const bin = atob(encoded.replace(/-/g, "+").replace(/_/g, "/"));
     const json = new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
     const entries = JSON.parse(json) as unknown;
     if (!Array.isArray(entries)) return [];
     return entries
-      .filter((e): e is SharedEntry =>
+      .filter((e): e is LegacyEntry =>
         Array.isArray(e) && typeof e[0] === "string" && PLATFORMS.includes(e[1]) && typeof e[2] === "string" && /^https?:\/\//.test(e[2]))
-      .slice(0, 200)
-      .map(([name, platform, feedUrl]) => ({ id: feedUrl, name: name.slice(0, 80), platform, feedUrl }));
+      .slice(0, MAX_SHARED)
+      .map(([name, platform, url]) => ({ url, name: name.slice(0, 80), platform }));
   } catch {
     return [];
   }
+}
+
+/** True if the hash carries a share link at all (even a broken one). */
+export function hasShareLink(hash: string): boolean {
+  return /(?:^#?|&)(r|follow)=/.test(hash);
 }
