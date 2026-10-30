@@ -127,9 +127,18 @@ export function loadCache(): Record<string, CachedFeed> {
   return read<Record<string, CachedFeed>>(CACHE_KEY) ?? {};
 }
 
+/**
+ * What's worth saving for an instant first paint: only in-stock coffees, since
+ * sold-out ones are never shown. Big roasters list hundreds of sold-out
+ * archive items, so this keeps storage small enough for many more roasters.
+ */
+export function compactCache(cache: Record<string, CachedFeed>): Record<string, CachedFeed> {
+  return Object.fromEntries(Object.entries(cache).map(([id, c]) => [id, { ...c, products: c.products.filter((p) => p.available) }]));
+}
+
 export function saveCache(cache: Record<string, CachedFeed>) {
   // The cache is only for instant first paint; if it doesn't fit, drop it.
-  if (!write(CACHE_KEY, cache)) {
+  if (!write(CACHE_KEY, compactCache(cache))) {
     try { window.localStorage.removeItem(CACHE_KEY); } catch { /* ignore */ }
   }
 }

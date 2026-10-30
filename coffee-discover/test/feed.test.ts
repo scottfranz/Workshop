@@ -173,3 +173,11 @@ describe("usual bag size", () => {
     expect(items.map((i) => i.size?.grams ?? null)).toEqual([null, 250]);
   });
 });
+
+describe("saved cache", () => {
+  it("keeps only in-stock coffees, and the rest of each entry", async () => {
+    const { compactCache } = await import("@/lib/storage");
+    const cache = { r: { fetchedAt: 5, skipped: ["Mug"], products: [product("in"), product("out", { available: false })] } };
+    expect(compactCache(cache)).toEqual({ r: { fetchedAt: 5, skipped: ["Mug"], products: [product("in")] } });
+  });
+});
