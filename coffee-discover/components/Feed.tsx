@@ -116,7 +116,7 @@ export function Feed() {
 
   function removeRoaster(id: string) {
     const r = state.roasters.find((x) => x.id === id);
-    if (r && !window.confirm(`Unfollow ${r.name}?`)) return;
+    if (r && !window.confirm(`Remove ${r.name} from your roasters?`)) return;
     setState((s) => ({ ...s, roasters: s.roasters.filter((x) => x.id !== id) }));
     if (roasterFilter === id) setRoasterFilter(null);
   }
@@ -205,13 +205,17 @@ export function Feed() {
               </button>
               {state.roasters.map((r) => {
                 const s = status[r.id]?.state;
+                const active = roasterFilter === r.id;
                 return (
-                  <button key={r.id} type="button" className="chip" aria-pressed={roasterFilter === r.id}
-                    onClick={() => setRoasterFilter(roasterFilter === r.id ? null : r.id)}
-                    title={s === "error" ? `Couldn't update ${r.name}` : undefined}>
-                    <span className={`chip-dot ${s === "loading" || s === "error" ? s : ""}`} style={{ "--rc": colorOf(r.id) } as React.CSSProperties} aria-hidden="true" />
-                    {r.name} <span className="chip-count">{countFor(r.id)}</span>
-                  </button>
+                  <span key={r.id} className={`chip-group${active ? " active" : ""}`}>
+                    <button type="button" className="chip" aria-pressed={active}
+                      onClick={() => setRoasterFilter(active ? null : r.id)}
+                      title={s === "error" ? `Couldn't update ${r.name}` : undefined}>
+                      <span className={`chip-dot ${s === "loading" || s === "error" ? s : ""}`} style={{ "--rc": colorOf(r.id) } as React.CSSProperties} aria-hidden="true" />
+                      {r.name} <span className="chip-count">{countFor(r.id)}</span>
+                    </button>
+                    <button type="button" className="chip-remove" onClick={() => removeRoaster(r.id)} aria-label={`Remove ${r.name}`} title={`Remove ${r.name}`}>×</button>
+                  </span>
                 );
               })}
             </nav>

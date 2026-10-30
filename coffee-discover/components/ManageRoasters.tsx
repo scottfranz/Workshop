@@ -52,7 +52,7 @@ export function ManageRoasters({ roasters, status, cache, onRename, onRecolor, o
               </div>
               <div className="row-actions">
                 <button type="button" className="btn btn-ghost icon-btn" onClick={() => onRefresh(r.id)} aria-label={`Refresh ${r.name}`} disabled={s?.state === "loading"}>↻</button>
-                <button type="button" className="btn btn-ghost btn-danger" onClick={() => onRemove(r.id)}>Unfollow</button>
+                <button type="button" className="btn btn-ghost btn-danger" onClick={() => onRemove(r.id)}>Remove</button>
               </div>
               <div className="roaster-meta">
                 {PLATFORM_LABELS[r.platform]} · <a href={r.feedUrl} target="_blank" rel="noopener noreferrer">{r.feedUrl.replace(/^https?:\/\//, "")}</a>
