@@ -3,6 +3,7 @@ import { collectSkipped, noteSkipped } from "./filter";
 import { fetchJsonLd } from "./jsonld";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
 import { fetchSquare, isSquareOnlineHtml } from "./square";
+import { fetchStorefront, isStorefrontHtml } from "./storefront";
 import { fetchShopify, parseShopify, shopifyProductsEndpoint } from "./shopify";
 import {
   SQUARESPACE_SHOP_GUESSES, fetchSquarespace, isSquarespaceProductPage, parseSquarespace, siteTitle, withFormatJson,
@@ -13,7 +14,7 @@ import { fetchWooCommerce, parseWooCommerce, wooEndpoint } from "./woocommerce";
 
 const MAX_PRODUCTS = 300;
 
-export const PLATFORMS: Platform[] = ["shopify", "woocommerce", "squarespace", "square", "bigcartel", "jsonld"];
+export const PLATFORMS: Platform[] = ["shopify", "storefront", "woocommerce", "squarespace", "square", "bigcartel", "jsonld"];
 
 export function normalizeUrl(raw: string): string {
   let s = raw.trim();
@@ -99,6 +100,7 @@ async function fetchFeedInner(source: FeedSource, opts: FeedOptions): Promise<Ro
     woocommerce: fetchWooCommerce,
     squarespace: fetchSquarespace,
     square: (url) => fetchSquare(url),
+    storefront: (url) => fetchStorefront(url),
     bigcartel: fetchBigCartel,
     jsonld: (url) => fetchJsonLd(url),
   };
@@ -174,6 +176,12 @@ async function detectFeedInner(rawUrl: string, followedMove = false, opts: FeedO
   const landedOn = new URL(page.url);
   if (!followedMove && landedOn.hostname.replace(/^www\./, "") !== new URL(url).hostname.replace(/^www\./, "")) {
     return detectFeedInner(landedOn.origin + new URL(url).pathname, true, opts);
+  }
+
+  // Headless Shopify: no /products.json, but pages embed Storefront API product data.
+  if (isStorefrontHtml(html)) {
+    const sf = await fetchStorefront(url, html).catch(() => null);
+    if (sf && sf.products.length > 0) return finish({ platform: "storefront", feedUrl: url }, sf.siteName, sf.products);
   }
 
   // The page is Shopify but /products.json didn't answer the first time. That's

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { timeAgo } from "@/lib/feed";
+import { isBundle, timeAgo } from "@/lib/feed";
 import { PLATFORM_LABELS } from "@/lib/scrapers/types";
 import { CURRENCIES } from "@/lib/money";
 import { encodeShare, type CachedFeed, type SavedRoaster } from "@/lib/storage";
@@ -49,7 +49,8 @@ export function ManageRoasters({
           const s = status[r.id];
           const at = cache[r.id]?.fetchedAt;
           const skipped = cache[r.id]?.skipped ?? [];
-          const unsized = (cache[r.id]?.products ?? []).filter((p) => p.available && !p.size).length;
+          // Sets and bundles have no single bag size, so they don't count.
+          const unsized = (cache[r.id]?.products ?? []).filter((p) => p.available && !p.size && !isBundle(p.title)).length;
           return (
             <li key={r.id} className="roaster-row">
               <div className="name-cell">

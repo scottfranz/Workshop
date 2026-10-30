@@ -32,6 +32,11 @@ export function markSeen(seen: SavedState["seen"], roasterId: string, products: 
  * in the roaster's catalogue after you started following them (which covers
  * stores that don't publish dates, like WooCommerce and many generic sites).
  */
+/** Sets, bundles, sample boxes and advent calendars: several coffees, so no single bag size. */
+export function isBundle(title: string): boolean {
+  return /\b(sets?|bundles?|box(es)?|advent|calendar|sampler|samplers|trio|duo|quartet|collection|tasting (menu|flight)|flight|discovery|variety pack|\d+\s*x\s*\d+)\b/i.test(title);
+}
+
 export function buildItems(
   roaster: SavedRoaster,
   products: Product[],
@@ -50,8 +55,9 @@ export function buildItems(
     const isNew = recentlyPublished || (arrivedAfterFollow && now - firstSeen < NEW_WINDOW_MS);
     return {
       ...p,
-      // Fill in the visitor's "usual bag size" for this roaster when the store doesn't say.
-      size: p.size ?? (roaster.usualBagGrams ? { grams: roaster.usualBagGrams, label: `${roaster.usualBagGrams} g` } : null),
+      // Fill in the visitor's "usual bag size" for this roaster when the store doesn't say,
+      // but not for sets and bundles, which hold several bags.
+      size: p.size ?? (roaster.usualBagGrams && !isBundle(p.title) ? { grams: roaster.usualBagGrams, label: `${roaster.usualBagGrams} g` } : null),
       roasterId: roaster.id,
       roasterName: roaster.name,
       key: `${roaster.id}::${p.id}`,

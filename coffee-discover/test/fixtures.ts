@@ -136,3 +136,25 @@ export const squareProductsPage2 = {
   data: [sq("rwanda", "Rwanda Kinini Village Lot 5-28", ["2"], 15.65, false, "Red currant, black tea.")],
   meta: { pagination: { total: 6, total_pages: 2 } },
 };
+
+// Headless Shopify (Next.js Commerce): products embedded in the App Router's streamed page data.
+const sfProduct = (id: number, handle: string, title: string, tags: string[], variants: [string, string, boolean][]) => ({
+  id: `gid://shopify/Product/${id}`, handle, availableForSale: true, title, description: "Varietal: SL28 Processing: Washed",
+  descriptionHtml: "<p>Varietal: SL28</p>", tags, options: [{ name: "Size", values: variants.map((v) => v[0]) }],
+  priceRange: { minVariantPrice: { amount: variants[0][1], currencyCode: "DKK" } },
+  featuredImage: { url: `https://cdn.shopify.com/s/files/${handle}.jpg` },
+  variants: variants.map(([t, amount, available]) => ({ title: t, availableForSale: available, selectedOptions: [{ name: "Size", value: t }], price: { amount, currencyCode: "DKK" } })),
+});
+const rsc = (data: unknown) => `<script>self.__next_f.push([1,${JSON.stringify(`3:["$","div",null,${JSON.stringify(data)}]`)}])</script>`;
+
+export const storefrontCollectionHtml = `<!doctype html><html><head><title>Filter Coffee | april coffee roasters</title>
+<link rel="preload" href="https://cdn.shopify.com/s/files/x.jpg"></head><body>
+<a href="/product/volcan-azul">Volcan Azul</a><a href="/product/volcan-azul-espresso">Volcan Azul</a>
+${rsc({ products: [
+  sfProduct(1, "volcan-azul", "Volcan Azul - Costa Rica", ["Filter Beans"], [["125g", "168.0", true], ["250g", "249.0", true], ["1kg", "816.0", true]]),
+  sfProduct(2, "volcan-azul-espresso", "Volcan Azul - Costa Rica", ["Espresso Beans"], [["250g", "249.0", true], ["1kg", "816.0", false]]),
+  sfProduct(3, "filter-cup-kit", "The April Filter Cup Kit", ["Brewers"], [["Default Title", "450.0", true]]),
+] })}</body></html>`;
+
+export const storefrontHomeHtml = `<!doctype html><html><head><title>april coffee roasters</title>
+<script>self.__next_f.push([1,"0:{}"])</script><img src="https://cdn.shopify.com/s/files/hero.jpg"></head><body><a href="/collections/everything">Shop</a></body></html>`;
