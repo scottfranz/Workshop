@@ -47,6 +47,16 @@ export function toNumber(v: unknown): number | null {
   return null;
 }
 
+/** "40g", "2 oz", "Sample" — sizes too small to be the bag someone is shopping for. */
+export function isSampleSize(label: string | null | undefined): boolean {
+  if (!label) return false;
+  if (/\bsample|\btaster|\btrial size/i.test(label)) return true;
+  const g = label.match(/(\d+(?:\.\d+)?)\s?(g|gr|grams?)\b/i);
+  if (g) return parseFloat(g[1]) < 100;
+  const oz = label.match(/(\d+(?:\.\d+)?)\s?(oz|ounces?)\b/i);
+  return oz ? parseFloat(oz[1]) < 3 : false;
+}
+
 export function minPrice(values: unknown[]): number | null {
   const nums = values.map(toNumber).filter((n): n is number => n !== null && n > 0);
   return nums.length ? Math.min(...nums) : null;

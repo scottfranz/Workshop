@@ -6,8 +6,9 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "test": "vitest run --exclude test/live.test.ts",
+    "typecheck": "tsc --noEmit",
+    "test:live": "NODE_USE_ENV_PROXY=1 vitest run test/live.test.ts"
   },
   "dependencies": {
     "next": "^16.4.3",

@@ -53,7 +53,14 @@ export function Feed() {
     try {
       const feed = await requestFeed({ url: r.feedUrl, platform: r.platform });
       setCache((c) => ({ ...c, [r.id]: { fetchedAt: Date.now(), products: feed.products, skipped: feed.skipped } }));
-      setState((s) => ({ ...s, seen: markSeen(s.seen, r.id, feed.products) }));
+      setState((s) => ({
+        ...s,
+        seen: markSeen(s.seen, r.id, feed.products),
+        // The roaster moved platform or domain and the server re-detected it: remember the new setup.
+        roasters: s.roasters.map((x) => (x.id === r.id && (x.platform !== feed.source.platform || x.feedUrl !== feed.source.feedUrl)
+          ? { ...x, platform: feed.source.platform, feedUrl: feed.source.feedUrl }
+          : x)),
+      }));
       setStatus((s) => ({ ...s, [r.id]: { state: "ok" } }));
     } catch (err) {
       setStatus((s) => ({ ...s, [r.id]: { state: "error", message: err instanceof Error ? err.message : String(err) } }));
@@ -223,9 +230,6 @@ export function Feed() {
             <div className="toolbar">
               <label className="sr-only" htmlFor="search">Search coffees</label>
               <input id="search" className="search" type="search" placeholder="Search origin, process, notes…" value={query} onChange={(e) => setQuery(e.target.value)} />
-              <label className="toggle">
-                <input type="checkbox" checked={!state.prefs.hideSoldOut} onChange={(e) => setPref("hideSoldOut", !e.target.checked)} /> Show sold out
-              </label>
               <label className="sr-only" htmlFor="sort">Sort</label>
               <select id="sort" className="select" value={state.prefs.sort} onChange={(e) => setPref("sort", e.target.value as SortMode)}>
                 <option value="newest">Newest first</option>

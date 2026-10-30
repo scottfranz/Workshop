@@ -49,7 +49,7 @@ export function AddRoasterForm({ onAdd, autoFocus, compact }: {
         <input id="roaster-url" className="input" type="text" inputMode="url" autoComplete="off" autoCapitalize="off" spellCheck={false}
           placeholder="roaster.com or roaster.com/collections/coffee" value={url} onChange={(e) => setUrl(e.target.value)} autoFocus={autoFocus} />
         <span className="hint">
-          Works with Shopify, WooCommerce, Squarespace and Big Cartel shops, plus most others that list products for search engines.
+          Works with Shopify, WooCommerce, Squarespace, Square Online and Big Cartel shops, plus most others that list products for search engines.
           If the homepage doesn&apos;t work, paste the link to their coffee page. A collection link (like /collections/single-origin) narrows the feed.
         </span>
       </div>

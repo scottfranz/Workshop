@@ -19,7 +19,7 @@ export interface ProductSignals {
 // Words that mean "not a bag of coffee" wherever they appear in a title.
 const NON_COFFEE_TITLE = [
   // gift cards, subscriptions, services
-  "gift card", "giftcard", "e-gift", "gift certificate", "subscription", "subscribe", "membership",
+  "gift card", "giftcard", "e-gift", "gift certificate", "subscription", "subscribe", "sub", "membership",
   "class", "workshop", "ticket", "donation", "tip jar", "shipping protection", "route package", "wholesale inquiry",
   // brewing gear
   "grinder", "dripper", "kettle", "scale", "filter", "filters", "carafe", "decanter", "brewer", "chemex", "aeropress",
@@ -36,12 +36,14 @@ const NON_COFFEE_TITLE = [
   // reading
   "book", "books", "atlas", "handbook", "magazine", "zine",
   // other drinks and food
-  "capsule", "capsules", "pods", "nespresso", "concentrate", "syrup", "tea", "chai", "matcha", "cocoa", "chocolate bar",
+  "capsule", "capsules", "pods", "nespresso", "cometeer", "rtd", "ready to drink", "concentrate", "syrup", "tea", "chai",
+  "matcha", "cocoa", "chocolate bar",
 ];
 
 const NON_COFFEE_TYPE = [
-  "merch", "apparel", "equipment", "gear", "accessor", "tool", "brew", "ware", "book", "water", "gift", "subscription",
-  "tea", "kitchen", "supplies", "cleaning", "service", "class", "drink",
+  "merch", "apparel", "equipment", "gear", "accessor", "tool", "brewer", "brewing", "ware", "book", "water", "gift",
+  "subscription", "tea", "kitchen", "supplies", "cleaning", "service", "class", "drink", "grinder", "machine",
+  "dripper", "kettle", "scale", "music", "vinyl", "record", "rtd", "capsule", "cometeer",
 ];
 
 const COFFEE_TYPE = ["coffee", "bean", "espresso", "single origin", "blend", "decaf", "green", "roast", "microlot", "sample"];
@@ -99,8 +101,9 @@ export function looksLikeCoffee(input: ProductSignals | string): boolean {
 
   // Hard no: the title names a non-coffee thing, or the store files it under gear/merch/books/etc.
   if (anyPhrase(titleForBlocklist, NON_COFFEE_TITLE) || hasPhrase(titleForBlocklist, "cup")) return false;
+  // A gear word in the category wins, so "Coffee Equipment" or "Coffee Grinders" isn't coffee.
+  if (type !== "" && NON_COFFEE_TYPE.some((w) => type.includes(w))) return false;
   const typeSaysCoffee = type !== "" && anyPhrase(type, COFFEE_TYPE);
-  if (!typeSaysCoffee && type !== "" && NON_COFFEE_TYPE.some((w) => type.includes(w))) return false;
   if (/(^|\|\s*)(merch|merchandise|gear|equipment|accessories|apparel|books?|water|tools?|brew gear)(\s*\||$)/.test(tags)) return false;
 
   // Yes if anything positively says coffee.
@@ -124,9 +127,31 @@ export async function collectSkipped<T>(fn: () => Promise<T>): Promise<[T, strin
   return [result, [...skipped].slice(0, 150)];
 }
 
+export function noteSkipped(title: string) {
+  skippedLog.getStore()?.add(title);
+}
+
 /** looksLikeCoffee, noting rejected titles for the current request. */
 export function keepCoffee(input: ProductSignals): boolean {
   const ok = looksLikeCoffee(input);
   if (!ok) skippedLog.getStore()?.add(input.title);
   return ok;
+}
+
+const SEARCH_DESCRIPTION_CHARS = 500;
+
+/**
+ * Text the feed's search looks through. The card only shows a short snippet
+ * (usually tasting notes), so details like "washed" further down the
+ * description would otherwise be unsearchable. Kept compact because it's
+ * cached in the visitor's browser: the start of the description, plus any
+ * origin, variety or process words found anywhere in it.
+ */
+export function searchTextFor(s: ProductSignals): string {
+  const description = (s.description ?? "").replace(/\s+/g, " ").trim();
+  const keywords = [...ORIGINS, ...COFFEE_WORDS].filter((w) => hasPhrase(description, w));
+  return [s.productType, ...(s.tags ?? []), ...(s.options ?? []), description.slice(0, SEARCH_DESCRIPTION_CHARS), ...keywords]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
 }

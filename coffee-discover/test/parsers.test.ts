@@ -16,7 +16,7 @@ describe("shopify", () => {
       id: "7001",
       url: "https://roaster.example/products/ethiopia-guji-hambela",
       image: "https://cdn.shopify.com/s/files/1/guji.jpg",
-      price: 19.5,
+      price: 22, // the 19.50 size is sold out
       currency: "USD",
       available: true,
       publishedAt: "2026-10-20T13:00:00.000Z",
@@ -132,6 +132,12 @@ describe("coffee filter", () => {
     ["Coffee Subscription", {}],
     ["Ceramic Mug", {}],
     ["Barista Toolkit", { productType: "Tools", description: "Great for espresso" }],
+    // found on live stores
+    ["1ZPRESSO - Q", { productType: "Grinder" }],
+    ["Ode Brew Grinder Gen 2", { productType: "Coffee Equipment" }],
+    ["Rainbow Hopper Easy Sub", { options: ["12oz"] }],
+    ["Monarch - Cometeer", { productType: "Coffee" }],
+    ["Salted Mocha RTD", {}],
   ])("drops %s", (title, extra) => {
     expect(coffee(title, extra)).toBe(false);
   });
@@ -158,6 +164,25 @@ describe("coffee filter", () => {
   });
 });
 
+describe("bag pricing", () => {
+  it("ignores sample sizes when a real bag size exists", async () => {
+    const { isSampleSize } = await import("@/lib/scrapers/text");
+    expect(["40g", "2 oz", "Sample", "50 grams"].map(isSampleSize)).toEqual([true, true, true, true]);
+    expect(["250g", "12oz", "1kg", "5 lb", "Default Title"].map(isSampleSize)).toEqual([false, false, false, false, false]);
+    const data = { products: [{ ...fx.shopifyProducts.products[0], variants: [
+      { title: "250g", price: "28.00", available: true }, { title: "40g", price: "7.00", available: true }, { title: "1kg", price: "98.00", available: true },
+    ] }] };
+    expect(parseShopify(data, "https://r.example")[0].price).toBe(28);
+  });
+
+  it("prices from in-stock sizes when some are sold out", () => {
+    const data = { products: [{ ...fx.shopifyProducts.products[0], variants: [
+      { title: "250g", price: "20.00", available: false }, { title: "1kg", price: "70.00", available: true },
+    ] }] };
+    expect(parseShopify(data, "https://r.example")[0].price).toBe(70);
+  });
+});
+
 describe("json-ld aggregate availability", () => {
   it("is unavailable when every child offer is out of stock", () => {
     const html = `<script type="application/ld+json">{"@type":"Product","name":"Kenya","offers":{"@type":"AggregateOffer","priceCurrency":"USD","lowPrice":"20",
@@ -181,28 +206,38 @@ describe("bilingual text", () => {
   });
 });
 
-describe("bilingual duplicates", () => {
-  const p = (id: string, title: string, image: string | null = null) => ({
-    id, title, url: `https://r.example/${id}`, image, price: 20, currency: "USD", available: true, publishedAt: null, description: null,
+describe("other-market listings", () => {
+  const p = (id: string, title: string) => ({
+    id, title, url: `https://r.example/${id}`, image: null, price: 20, currency: "USD", available: true, publishedAt: null, description: null,
   });
 
-  it("keeps the English listing and drops its bilingual twin", async () => {
-    const { dropBilingualDuplicates } = await import("@/lib/scrapers");
-    const out = dropBilingualDuplicates([
-      p("1", "SCAJ - El Espejo"),
+  it("drops CJK-titled listings from a mostly English catalogue", async () => {
+    const { dropOtherMarketListings } = await import("@/lib/scrapers");
+    const out = dropOtherMarketListings([
+      p("1", "Ethiopia Guji"),
       p("2", "SCAJ - El Espejo. フィンカ・エル・エスペホ"),
-      p("3", "Fabio Caballero La Salvaje Washed Gesha"),
-      p("4", "SCAJ - Fabio Caballero COE Washed Gesha ラ•サルバヘ. ウォッシュド. ゲシャ", "https://cdn.shopify.com/a.jpg?v=2"),
-      p("5", "Red Honey Sidra", "https://cdn.shopify.com/a.jpg?v=1"),
-      p("6", "SCAJ - Vinka Washed Sidra ヴィンカ. ウォッシュド. シドラ"),
+      p("3", "Kenya Kiambu"),
+      p("4", "SCAJ - Vinka Washed Sidra ヴィンカ. ウォッシュド. シドラ"),
+      p("5", "Colombia Huila"),
     ]);
-    // 2 matches by name, 4 matches 5 by photo; 6 has no English twin so it stays.
-    expect(out.map((x) => x.id)).toEqual(["1", "3", "5", "6"]);
+    expect(out.map((x) => x.id)).toEqual(["1", "3", "5"]);
   });
 
-  it("leaves Japanese-only roasters alone", async () => {
-    const { dropBilingualDuplicates } = await import("@/lib/scrapers");
-    const list = [p("1", "エチオピア グジ"), p("2", "ケニア")];
-    expect(dropBilingualDuplicates(list)).toBe(list);
+  it("leaves mostly-Japanese roasters alone", async () => {
+    const { dropOtherMarketListings } = await import("@/lib/scrapers");
+    const list = [p("1", "エチオピア グジ"), p("2", "Kenya ケニア"), p("3", "Seasonal Blend")];
+    expect(dropOtherMarketListings(list)).toBe(list);
+  });
+});
+
+describe("search text", () => {
+  it("captures process words from deep in the description", async () => {
+    const { searchTextFor } = await import("@/lib/scrapers/filter");
+    const long = "Tasting notes: peach and jasmine. " + "Lorem ipsum about the farm. ".repeat(40) + "This lot is Washed and dried on raised beds.";
+    const text = searchTextFor({ title: "Hambela", productType: "Coffee", tags: ["Single Origin"], description: long, options: ["12oz"] });
+    expect(text).toContain("washed");
+    expect(text).toContain("single origin");
+    expect(text).toContain("12oz");
+    expect(text.length).toBeLessThan(700);
   });
 });

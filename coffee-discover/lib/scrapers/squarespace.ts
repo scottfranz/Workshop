@@ -1,4 +1,4 @@
-import { keepCoffee } from "./filter";
+import { keepCoffee, searchTextFor } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
 import { absoluteUrl, minPrice, stripHtml, summarize, toIso, toNumber } from "./text";
 import type { Product } from "./types";
@@ -82,7 +82,8 @@ export function parseSquarespace(data: unknown, feedUrl: string): Product[] {
       ...(v.optionValues ?? []).flatMap((o) => [o.optionName ?? "", o.value ?? ""]),
     ]);
     const description = stripHtml(`${item.excerpt ?? ""} ${item.body ?? ""}`);
-    if (!keepCoffee({ title, description, options })) continue;
+    const signals = { title, description, options };
+    if (!keepCoffee(signals)) continue;
     products.push({
       id: item.id ?? item.fullUrl,
       title,
@@ -93,6 +94,7 @@ export function parseSquarespace(data: unknown, feedUrl: string): Product[] {
       available: variants.some(variantInStock),
       publishedAt: toIso(item.publishOn ?? item.addedOn),
       description: summarize(item.excerpt || item.body),
+      searchText: searchTextFor(signals),
     });
   }
   return products;

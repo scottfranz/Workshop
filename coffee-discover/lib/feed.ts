@@ -61,13 +61,19 @@ export function buildItems(
   });
 }
 
+/** Every word must appear somewhere ("washed kenya" finds washed Kenyan coffees). */
+function matchesQuery(i: FeedItem, query: string): boolean {
+  const haystack = `${i.title} ${i.roasterName} ${i.description ?? ""} ${i.searchText ?? ""}`.toLowerCase();
+  return query.split(/\s+/).every((word) => haystack.includes(word));
+}
+
 export function filterAndSort(items: FeedItem[], prefs: Prefs, opts: { roasterId: string | null; query: string; hidden: Set<string> }): FeedItem[] {
   const q = opts.query.trim().toLowerCase();
   const out = items.filter((i) => {
     if (opts.hidden.has(i.key)) return false;
-    if (prefs.hideSoldOut && !i.available) return false;
+    if (!i.available) return false;
     if (opts.roasterId && i.roasterId !== opts.roasterId) return false;
-    if (q && !`${i.title} ${i.roasterName} ${i.description ?? ""}`.toLowerCase().includes(q)) return false;
+    if (q && !matchesQuery(i, q)) return false;
     return true;
   });
   const price = (i: FeedItem, missing: number) => i.price ?? missing;

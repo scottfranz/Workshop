@@ -1,7 +1,8 @@
 import { fetchBigCartel, isBigCartelList, parseBigCartel } from "./bigcartel";
-import { collectSkipped } from "./filter";
+import { collectSkipped, noteSkipped } from "./filter";
 import { fetchJsonLd } from "./jsonld";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
+import { fetchSquare, isSquareOnlineHtml } from "./square";
 import { fetchShopify, parseShopify, shopifyMeta, shopifyProductsEndpoint } from "./shopify";
 import {
   SQUARESPACE_SHOP_GUESSES, fetchSquarespace, isSquarespaceProductPage, parseSquarespace, siteTitle, withFormatJson,
@@ -12,7 +13,7 @@ import { fetchWooCommerce, parseWooCommerce, wooEndpoint } from "./woocommerce";
 
 const MAX_PRODUCTS = 300;
 
-export const PLATFORMS: Platform[] = ["shopify", "woocommerce", "squarespace", "bigcartel", "jsonld"];
+export const PLATFORMS: Platform[] = ["shopify", "woocommerce", "squarespace", "square", "bigcartel", "jsonld"];
 
 export function normalizeUrl(raw: string): string {
   let s = raw.trim();
@@ -25,32 +26,35 @@ export function normalizeUrl(raw: string): string {
   return u.toString().replace(/\/$/, "");
 }
 
-const comparable = (title: string) => preferLatin(title).toLowerCase().replace(/\bscaj\b/g, "").replace(/[^a-z0-9]+/g, "");
-const imageKey = (src: string | null) => (src ? src.replace(/^https?:/, "").split("?")[0] : null);
-
 /**
- * Some roasters list the same coffee twice: once in English and once with a
- * bilingual (e.g. English + Japanese) title for another market. Drop the
- * bilingual copy when an English-only listing has the same name or photo.
+ * Roasters selling in several countries sometimes list products for another
+ * market (e.g. Regalia's Japanese SCAJ listings) that 404 for everyone else.
+ * When most of a catalogue has Latin-script titles, leave out the listings
+ * titled in Japanese/Chinese/Korean. Mostly-CJK catalogues are left alone.
  */
-export function dropBilingualDuplicates(products: Product[]): Product[] {
-  const latin = products.filter((p) => !CJK.test(p.title));
-  if (latin.length === 0 || latin.length === products.length) return products;
-  const names = latin.map((p) => comparable(p.title)).filter((n) => n.length >= 4);
-  const images = new Set(latin.map((p) => imageKey(p.image)).filter(Boolean));
-  return products.filter((p) => {
-    if (!CJK.test(p.title)) return true;
-    const name = comparable(p.title);
-    if (images.has(imageKey(p.image))) return false;
-    return !names.some((n) => n === name || (name.length >= 6 && (n.includes(name) || name.includes(n))));
-  });
+export function dropOtherMarketListings(products: Product[]): Product[] {
+  const foreign = products.filter((p) => CJK.test(p.title));
+  if (foreign.length === 0 || foreign.length * 2 >= products.length) return products;
+  for (const p of foreign) noteSkipped(p.title);
+  return products.filter((p) => !CJK.test(p.title));
+}
+
+// Tips, add-ons and free samples ($0.01, $1) aren't bags of coffee. Skipped for
+// currencies where 2 units is still a real price floor problem (JPY, KRW...).
+const SMALL_UNIT_CURRENCIES = new Set(["JPY", "KRW", "VND", "IDR", "CLP", "COP", "HUF", "TWD", "INR", "THB", "PHP"]);
+function isRealPrice(p: Product): boolean {
+  if (p.price === null || p.price >= 2 || (p.currency && SMALL_UNIT_CURRENCIES.has(p.currency))) return true;
+  noteSkipped(p.title);
+  return false;
 }
 
 function finish(source: FeedSource, siteName: string | null, products: Product[]): RoasterFeed {
   return {
     source,
     siteName,
-    products: dropBilingualDuplicates(products)
+    products: dropOtherMarketListings(products.filter(isRealPrice))
+      // Big catalogues are mostly sold-out archives; make sure the cap keeps what's buyable.
+      .sort((a, b) => Number(b.available) - Number(a.available))
       .slice(0, MAX_PRODUCTS)
       .map((p) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
   };
@@ -61,9 +65,21 @@ async function withSkipped(fn: () => Promise<RoasterFeed>): Promise<RoasterFeed>
   return { ...feed, skipped: skipped.map((t) => preferLatin(t)) };
 }
 
-/** Read a roaster whose platform we already know. */
+/**
+ * Read a roaster whose platform we already know. Roasters do move (WooCommerce
+ * to Shopify, new domain), so if the saved setup stops working, detect afresh;
+ * the response's source tells the client to update what it saved.
+ */
 export function fetchFeed(source: FeedSource): Promise<RoasterFeed> {
-  return withSkipped(() => fetchFeedInner(source));
+  return withSkipped(async () => {
+    try {
+      return await fetchFeedInner(source);
+    } catch (err) {
+      const fresh = await detectFeedInner(source.feedUrl).catch(() => null);
+      if (fresh && fresh.products.length > 0) return fresh;
+      throw err;
+    }
+  });
 }
 
 /** Work out how to read a store from whatever link someone pasted. */
@@ -76,6 +92,7 @@ async function fetchFeedInner(source: FeedSource): Promise<RoasterFeed> {
     shopify: fetchShopify,
     woocommerce: fetchWooCommerce,
     squarespace: fetchSquarespace,
+    square: (url) => fetchSquare(url),
     bigcartel: fetchBigCartel,
     jsonld: (url) => fetchJsonLd(url),
   };
@@ -117,7 +134,7 @@ async function detectSquarespace(url: string, html: string): Promise<RoasterFeed
 }
 
 // Homepage, shop page or collection link: cheapest, most reliable checks go first.
-async function detectFeedInner(rawUrl: string): Promise<RoasterFeed> {
+async function detectFeedInner(rawUrl: string, followedMove = false): Promise<RoasterFeed> {
   const url = normalizeUrl(rawUrl);
   const origin = new URL(url).origin;
 
@@ -151,11 +168,22 @@ async function detectFeedInner(rawUrl: string): Promise<RoasterFeed> {
   if (page.status >= 400) throw new FetchError(`The site returned an error (${page.status}). Is the link right?`, page.status);
   const html = page.body;
 
+  // The roaster moved to a new domain (e.g. subtextcoffee.com → subtext.coffee): start over there.
+  const landedOn = new URL(page.url);
+  if (!followedMove && landedOn.hostname.replace(/^www\./, "") !== new URL(url).hostname.replace(/^www\./, "")) {
+    return detectFeedInner(landedOn.origin + new URL(url).pathname, true);
+  }
+
   // The page is Shopify but /products.json didn't answer the first time. That's
   // usually a momentary block or rate limit, so try once more before falling back.
   if (isShopifyHtml(html)) {
     const retry = await fetchShopify(url).catch(() => null);
     if (retry && retry.products.length > 0) return finish({ platform: "shopify", feedUrl: url }, retry.siteName, retry.products);
+  }
+
+  if (isSquareOnlineHtml(html)) {
+    const sq = await fetchSquare(url, html);
+    return finish({ platform: "square", feedUrl: url }, sq.siteName, sq.products);
   }
 
   if (isSquarespaceHtml(html)) {

@@ -1,9 +1,10 @@
-export type Platform = "shopify" | "woocommerce" | "squarespace" | "bigcartel" | "jsonld";
+export type Platform = "shopify" | "woocommerce" | "squarespace" | "square" | "bigcartel" | "jsonld";
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   shopify: "Shopify",
   woocommerce: "WooCommerce",
   squarespace: "Squarespace",
+  square: "Square Online",
   bigcartel: "Big Cartel",
   jsonld: "Web page",
 };
@@ -22,6 +23,8 @@ export interface Product {
   publishedAt: string | null;
   /** Short plain-text blurb, usually containing tasting notes. */
   description: string | null;
+  /** Extra text search matches against: fuller description, category, tags, sizes, origin/process/variety words. */
+  searchText?: string;
 }
 
 /** Where and how to read a roaster's catalogue. Returned by detection, stored client-side. */

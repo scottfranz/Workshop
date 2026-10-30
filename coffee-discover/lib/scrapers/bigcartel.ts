@@ -1,4 +1,4 @@
-import { keepCoffee } from "./filter";
+import { keepCoffee, searchTextFor } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
 import { absoluteUrl, minPrice, summarize, toIso } from "./text";
 import type { Product } from "./types";
@@ -29,7 +29,8 @@ export function parseBigCartel(data: unknown, feedUrl: string, currency: string 
     if (!title) continue;
     const cats = (p.categories ?? []).map((c) => c.name ?? "").join(" ");
     const options = p.options ?? [];
-    if (!keepCoffee({ title, productType: cats, description: p.description, options: options.map((o) => o.name ?? "") })) continue;
+    const signals = { title, productType: cats, description: p.description, options: options.map((o) => o.name ?? "") };
+    if (!keepCoffee(signals)) continue;
     products.push({
       id: String(p.id),
       title,
@@ -40,6 +41,7 @@ export function parseBigCartel(data: unknown, feedUrl: string, currency: string 
       available: p.status !== "sold-out" && (options.length === 0 || options.some((o) => !o.sold_out)),
       publishedAt: toIso(p.created_at),
       description: summarize(p.description),
+      searchText: searchTextFor(signals),
     });
   }
   return products;

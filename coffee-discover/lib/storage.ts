@@ -19,7 +19,6 @@ export type ViewMode = "grid" | "list";
 
 export interface Prefs {
   view: ViewMode;
-  hideSoldOut: boolean;
   sort: SortMode;
 }
 
@@ -46,7 +45,7 @@ const STATE_KEY = "beanfeed:v1";
 const CACHE_KEY = "beanfeed:cache:v1";
 const SEEN_TTL_MS = 120 * 24 * 60 * 60 * 1000;
 
-export const DEFAULT_PREFS: Prefs = { view: "grid", hideSoldOut: true, sort: "newest" };
+export const DEFAULT_PREFS: Prefs = { view: "grid", sort: "newest" };
 
 export function emptyState(): SavedState {
   return { version: 1, roasters: [], seen: {}, hidden: [], lastVisit: null, prevVisit: null, prefs: { ...DEFAULT_PREFS } };
@@ -154,7 +153,7 @@ export function encodeShare(roasters: SavedRoaster[]): string {
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
-const PLATFORMS: Platform[] = ["shopify", "woocommerce", "squarespace", "bigcartel", "jsonld"];
+const PLATFORMS: Platform[] = ["shopify", "woocommerce", "squarespace", "square", "bigcartel", "jsonld"];
 
 export function decodeShare(encoded: string): Omit<SavedRoaster, "addedAt">[] {
   try {

@@ -73,6 +73,25 @@ describe("detectFeed", () => {
     expect(feed.products[0].title).toBe("Burundi Kayanza");
   });
 
+  it("detects Square Online and limits the feed to the linked category", async () => {
+    const api = "https://sw.example/app/store/api/v28/editor/users/144301722/sites/609617072503030687/products?per_page=100";
+    mockSite({
+      "https://sw.example/shop/single-origin-coffees-lighter-roasts/2": { body: fx.squareHtml },
+      [`${api}&page=1&include=images,categories`]: { body: fx.squareProductsPage1 },
+      [`${api}&page=2&include=images,categories`]: { body: fx.squareProductsPage2 },
+    });
+    const feed = await detectFeed("https://sw.example/shop/single-origin-coffees-lighter-roasts/2");
+    expect(feed.source).toEqual({ platform: "square", feedUrl: "https://sw.example/shop/single-origin-coffees-lighter-roasts/2" });
+    expect(feed.siteName).toBe("S&W Craft Roasting");
+    // Archive item is outside category 2; the sample, tip and hidden product are dropped.
+    expect(feed.products.map((p) => p.title)).toEqual(["Kenya Kii AB", "Rwanda Kinini Village Lot 5-28"]);
+    expect(feed.products[0]).toMatchObject({
+      url: "https://sw.example/product/kenya-kii/1", price: 17.1, currency: "USD", available: true,
+      image: "https://1.cdn6.editmysite.com/uploads/kenya-kii.jpeg",
+    });
+    expect(feed.skipped).toEqual(expect.arrayContaining(["Add a Sample", "Thank the fellas!"]));
+  });
+
   it("falls back to JSON-LD and crawls listed product pages", async () => {
     mockSite({
       "https://riverbend.example/shop": { body: fx.jsonLdListingHtml },
@@ -119,11 +138,52 @@ describe("resilience", () => {
     expect(feed.products).toHaveLength(2);
   });
 
-  it("cleans bilingual titles in the final feed", async () => {
+  it("leaves out other-market listings and reports them as skipped", async () => {
+    const base = fx.shopifyProducts.products[0];
     mockSite({
-      "https://jp.example/products.json?limit=250": { body: { products: [{ ...fx.shopifyProducts.products[0], title: "SCAJ - El Espejo. フィンカ・エル・エスペホ" }] } },
+      "https://jp.example/products.json?limit=250": { body: { products: [
+        { ...base, id: 1, handle: "a", title: "Ethiopia Guji" },
+        { ...base, id: 2, handle: "b", title: "Kenya Nyeri" },
+        { ...base, id: 3, handle: "c", title: "SCAJ - El Espejo. フィンカ・エル・エスペホ" },
+      ] } },
     });
-    expect((await detectFeed("jp.example")).products[0].title).toBe("SCAJ - El Espejo");
+    const feed = await detectFeed("jp.example");
+    expect(feed.products.map((x) => x.title)).toEqual(["Ethiopia Guji", "Kenya Nyeri"]);
+    expect(feed.skipped).toEqual(["SCAJ - El Espejo"]);
+  });
+});
+
+describe("roasters that move", () => {
+  it("follows a move to a new domain", async () => {
+    mockSite({
+      "https://old.example/": { status: 301, body: "", location: "https://www.new.example/" },
+      "https://www.new.example/": { body: '<script src="//cdn.shopify.com/x.js"></script>' },
+      "https://www.new.example/products.json?limit=250": { body: fx.shopifyProducts },
+    });
+    const feed = await detectFeed("old.example");
+    expect(feed.source).toEqual({ platform: "shopify", feedUrl: "https://www.new.example" });
+    expect(feed.products).toHaveLength(2);
+  });
+
+  it("keeps https when a move redirects to plain http", async () => {
+    const calls = mockSite({
+      "https://old.example/": { status: 301, body: "", location: "http://www.new.example/" },
+      "https://www.new.example/": { body: '<script src="//cdn.shopify.com/x.js"></script>' },
+      "https://www.new.example/products.json?limit=250": { body: fx.shopifyProducts },
+    });
+    expect((await detectFeed("old.example")).source.feedUrl).toBe("https://www.new.example");
+    expect(calls.some((c) => c.startsWith("http://"))).toBe(false);
+  });
+
+  it("re-detects a saved roaster that switched from WooCommerce to Shopify", async () => {
+    const { fetchFeed } = await import("@/lib/scrapers");
+    mockSite({
+      "https://moved.example/products.json?limit=250": { body: fx.shopifyProducts },
+      "https://moved.example/products.json?limit=250&page=1": { body: fx.shopifyProducts },
+    });
+    const feed = await fetchFeed({ platform: "woocommerce", feedUrl: "https://moved.example" });
+    expect(feed.source.platform).toBe("shopify");
+    expect(feed.products).toHaveLength(2);
   });
 });
 

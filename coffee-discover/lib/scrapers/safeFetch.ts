@@ -116,7 +116,10 @@ async function safeFetchTextOnce(raw: string, accept: string): Promise<FetchedTe
       throw new FetchError(msg);
     }
     if (res.status >= 300 && res.status < 400 && res.headers.get("location")) {
-      current = new URL(res.headers.get("location")!, url).toString();
+      const next = new URL(res.headers.get("location")!, url);
+      // Some stores redirect https → http by mistake (e.g. to a new domain); stay on https.
+      if (url.protocol === "https:" && next.protocol === "http:") next.protocol = "https:";
+      current = next.toString();
       continue;
     }
     return {
