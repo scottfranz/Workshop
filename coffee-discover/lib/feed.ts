@@ -32,6 +32,11 @@ export function markSeen(seen: SavedState["seen"], roasterId: string, products: 
  * in the roaster's catalogue after you started following them (which covers
  * stores that don't publish dates, like WooCommerce and many generic sites).
  */
+/** Sets, bundles, sample boxes and advent calendars: several coffees, so no single bag size. */
+export function isBundle(title: string): boolean {
+  return /\b(sets?|bundles?|box(es)?|advent|calendar|sampler|samplers|trio|duo|quartet|collection|tasting (menu|flight)|flight|discovery|variety pack|\d+\s*x\s*\d+)\b/i.test(title);
+}
+
 export function buildItems(
   roaster: SavedRoaster,
   products: Product[],
@@ -50,8 +55,9 @@ export function buildItems(
     const isNew = recentlyPublished || (arrivedAfterFollow && now - firstSeen < NEW_WINDOW_MS);
     return {
       ...p,
-      // Fill in the visitor's "usual bag size" for this roaster when the store doesn't say.
-      size: p.size ?? (roaster.usualBagGrams ? { grams: roaster.usualBagGrams, label: `${roaster.usualBagGrams} g` } : null),
+      // Fill in the visitor's "usual bag size" for this roaster when the store doesn't say,
+      // but not for sets and bundles, which hold several bags.
+      size: p.size ?? (roaster.usualBagGrams && !isBundle(p.title) ? { grams: roaster.usualBagGrams, label: `${roaster.usualBagGrams} g` } : null),
       roasterId: roaster.id,
       roasterName: roaster.name,
       key: `${roaster.id}::${p.id}`,
@@ -88,11 +94,17 @@ export function filterAndSort(
   });
   const common = (amount: number, currency: string | null) => (opts.toCommon ? opts.toCommon(amount, currency) : amount);
   const price = (i: FeedItem, missing: number) => (i.price === null ? missing : common(i.price, i.currency));
-  const cup = (i: FeedItem) => { const c = pricePerCup(i, prefs.cupGrams); return c === null ? Infinity : common(c, i.currency); };
+  const cup = (i: FeedItem) => { const c = pricePerCup(i, prefs.cupGrams); return c === null ? null : common(c, i.currency); };
+  // Coffees without a known size sort last either way.
+  const byCup = (dir: 1 | -1) => (a: FeedItem, b: FeedItem) => {
+    const ca = cup(a), cb = cup(b);
+    return ca === null ? (cb === null ? 0 : 1) : cb === null ? -1 : (ca - cb) * dir;
+  };
   switch (prefs.sort) {
     case "price-asc": return out.sort((a, b) => price(a, Infinity) - price(b, Infinity));
     case "price-desc": return out.sort((a, b) => price(b, -1) - price(a, -1));
-    case "per-cup": return out.sort((a, b) => cup(a) - cup(b));
+    case "per-cup": return out.sort(byCup(1));
+    case "per-cup-desc": return out.sort(byCup(-1));
     case "roaster": return out.sort((a, b) => a.roasterName.localeCompare(b.roasterName) || b.arrivedAt - a.arrivedAt);
     default: return out.sort((a, b) => b.arrivedAt - a.arrivedAt);
   }

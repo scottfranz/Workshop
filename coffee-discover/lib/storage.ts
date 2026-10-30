@@ -15,7 +15,7 @@ export interface SavedRoaster {
   usualBagGrams?: number;
 }
 
-export type SortMode = "newest" | "price-asc" | "price-desc" | "per-cup" | "roaster";
+export type SortMode = "newest" | "price-asc" | "price-desc" | "per-cup" | "per-cup-desc" | "roaster";
 
 export type ViewMode = "grid" | "list";
 
@@ -161,7 +161,7 @@ export interface SharedRoaster {
   platform?: Platform;
 }
 
-const PLATFORMS: Platform[] = ["shopify", "woocommerce", "squarespace", "square", "bigcartel", "jsonld"];
+const PLATFORMS: Platform[] = ["shopify", "storefront", "woocommerce", "squarespace", "square", "bigcartel", "jsonld"];
 const MAX_SHARED = 200;
 
 /** Compare roaster addresses loosely: scheme, "www.", case and trailing slash don't matter. */

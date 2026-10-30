@@ -150,6 +150,8 @@ describe("price per cup", () => {
     ], {}, null, NOW);
     const sorted = filterAndSort(items, { ...DEFAULT_PREFS, sort: "per-cup" }, { roasterId: null, query: "", hidden: new Set() });
     expect(sorted.map((i) => i.id)).toEqual(["cheap-big", "pricey-small", "no-size"]);
+    const desc = filterAndSort(items, { ...DEFAULT_PREFS, sort: "per-cup-desc" }, { roasterId: null, query: "", hidden: new Set() });
+    expect(desc.map((i) => i.id)).toEqual(["pricey-small", "cheap-big", "no-size"]);
   });
 });
 
@@ -159,5 +161,15 @@ describe("usual bag size", () => {
     const items = buildItems(r, [product("a"), product("b", { size: { grams: 340, label: "12 oz" } })], {}, null, NOW);
     expect(items.map((i) => i.size)).toEqual([{ grams: 250, label: "250 g" }, { grams: 340, label: "12 oz" }]);
     expect(buildItems(roaster, [product("a")], {}, null, NOW)[0].size).toBeNull();
+  });
+
+  it("doesn't give sets, bundles or advent calendars a bag size", async () => {
+    const { isBundle } = await import("@/lib/feed");
+    for (const t of ["Vinka Set", "Discovery Box", "2026 Advent Calendar", "Best Seller's Collection", "Espresso Trio", "April Tasting Menu", "Blend Box"]) {
+      expect(isBundle(t)).toBe(true);
+    }
+    for (const t of ["Ethiopia Guji Hambela", "Sunset Blend", "Boxer Espresso", "Colombia Pink Bourbon"]) expect(isBundle(t)).toBe(false);
+    const items = buildItems({ ...roaster, usualBagGrams: 250 }, [product("set", { title: "Vinka Set" }), product("single", { title: "Kenya Kiambu" })], {}, null, NOW);
+    expect(items.map((i) => i.size?.grams ?? null)).toEqual([null, 250]);
   });
 });

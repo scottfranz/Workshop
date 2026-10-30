@@ -415,6 +415,7 @@ export function Feed() {
                 <option value="price-asc">Price: low to high</option>
                 <option value="price-desc">Price: high to low</option>
                 <option value="per-cup">Price per cup: low to high</option>
+                <option value="per-cup-desc">Price per cup: high to low</option>
                 <option value="roaster">By roaster</option>
               </select>
               <div className="segmented" role="group" aria-label="Layout">

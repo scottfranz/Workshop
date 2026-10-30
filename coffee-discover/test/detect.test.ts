@@ -152,6 +152,23 @@ describe("detectFeed", () => {
     expect(feed.skipped).toEqual(expect.arrayContaining(["Add a Sample", "Thank the fellas!"]));
   });
 
+  it("reads headless Shopify stores via the sitemap's coffee collections", async () => {
+    mockSite({
+      "https://april.example/": { body: fx.storefrontHomeHtml },
+      "https://april.example/sitemap.xml": { type: "application/xml", body: `<urlset>
+        <url><loc>https://april-headless.vercel.app/collections/filter-coffee</loc></url>
+        <url><loc>https://april-headless.vercel.app/collections/paper-filter</loc></url>
+        <url><loc>https://april-headless.vercel.app/collections/clothing</loc></url></urlset>` },
+      "https://april.example/collections/filter-coffee": { body: fx.storefrontCollectionHtml },
+    });
+    const feed = await detectFeed("april.example");
+    expect(feed.source).toEqual({ platform: "storefront", feedUrl: "https://april.example" });
+    expect(feed.products.map((p) => p.title).sort()).toEqual(["Volcan Azul - Costa Rica (Espresso)", "Volcan Azul - Costa Rica (Filter)"]);
+    const filter = feed.products.find((p) => p.title.endsWith("(Filter)"))!;
+    expect(filter).toMatchObject({ price: 168, currency: "DKK", size: { grams: 125, label: "125 g" }, url: "https://april.example/product/volcan-azul" });
+    expect(feed.skipped).toContain("The April Filter Cup Kit");
+  });
+
   it("falls back to JSON-LD and crawls listed product pages", async () => {
     mockSite({
       "https://riverbend.example/shop": { body: fx.jsonLdListingHtml },
