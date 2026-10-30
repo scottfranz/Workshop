@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { buildItems, filterAndSort, markSeen, type FeedItem } from "@/lib/feed";
 import type { Product, RoasterFeed } from "@/lib/scrapers/types";
-import { SITE_NAME, SUGGESTED_ROASTERS } from "@/lib/site";
+import { SITE_NAME } from "@/lib/site";
 import {
   ROASTER_COLORS, beginVisit, decodeShare, emptyState, loadCache, loadState, pickColor, saveCache, saveState, withColors,
   type CachedFeed, type Prefs, type SavedRoaster, type SavedState, type SortMode, type ViewMode,
@@ -45,10 +45,22 @@ export function Feed() {
   const [pendingImport, setPendingImport] = useState<Omit<SavedRoaster, "addedAt">[] | null>(null);
   const [lastHidden, setLastHidden] = useState<string | null>(null);
   const [chipsOpen, setChipsOpen] = useState(false);
+  const [shareNote, setShareNote] = useState<string | null>(null);
   const [hiddenChips, setHiddenChips] = useState(0);
   const barRef = useRef<HTMLElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
+
+  const readShareLink = useCallback(() => {
+    const encoded = new URLSearchParams(window.location.hash.slice(1)).get("follow");
+    if (!encoded) return;
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    const shared = decodeShare(encoded);
+    const following = new Set(stateRef.current.roasters.map((r) => r.id));
+    const incoming = shared.filter((r) => !following.has(r.id));
+    if (incoming.length) setPendingImport(incoming);
+    else setShareNote(shared.length ? "You already follow every roaster in that link." : "That share link looks incomplete. Try copying it again.");
+  }, []);
 
   // ── Loading & saving ──────────────────────────────────────────────────────
   const refreshOne = useCallback(async (r: SavedRoaster) => {
@@ -81,18 +93,21 @@ export function Feed() {
     const loaded = beginVisit(loadState());
     const cached = loadCache();
     setState(loaded);
+    stateRef.current = loaded; // readShareLink below compares against what's saved
     setCache(cached);
     setStorageOk(saveState(loaded));
     setReady(true);
 
-    const hash = new URLSearchParams(window.location.hash.slice(1)).get("follow");
-    if (hash) {
-      const incoming = decodeShare(hash).filter((r) => !loaded.roasters.some((x) => x.id === r.id));
-      if (incoming.length) setPendingImport(incoming);
-      history.replaceState(null, "", window.location.pathname + window.location.search);
-    }
+    readShareLink();
     refreshMany(loaded.roasters.filter((r) => !cached[r.id] || Date.now() - cached[r.id].fetchedAt > STALE_MS));
-  }, [refreshMany]);
+  }, [refreshMany, readShareLink]);
+
+  // Pasting a share link into a tab that already has the site open only changes
+  // the #fragment, which doesn't reload the page, so listen for that too.
+  useEffect(() => {
+    window.addEventListener("hashchange", readShareLink);
+    return () => window.removeEventListener("hashchange", readShareLink);
+  }, [readShareLink]);
 
   useEffect(() => {
     if (ready) setStorageOk(saveState(state));
@@ -153,6 +168,17 @@ export function Feed() {
     if (roasterFilter === id) setRoasterFilter(null);
   }
 
+  function removeAllRoasters() {
+    const n = state.roasters.length;
+    if (!window.confirm(`Remove all ${n} roaster${n === 1 ? "" : "s"}? This can't be undone.`)) return;
+    // Seen history, hidden coffees and the cache are per roaster, so they go too.
+    setState((s) => ({ ...s, roasters: [], seen: {}, hidden: [] }));
+    setCache({});
+    setStatus({});
+    setRoasterFilter(null);
+    setDialog(null);
+  }
+
   function importShared() {
     if (!pendingImport) return;
     const now = Date.now();
@@ -192,17 +218,20 @@ export function Feed() {
     <>
       <header className="site-header">
         <div className="wrap">
-          <a className="brand" href="/">{SITE_NAME}</a>
+          <a className="brand" href="/">
+            <img className="brand-mark" src="/icon.svg" alt="" />
+            {SITE_NAME}
+          </a>
           {ready && state.roasters.length > 0 && (
             <div className="header-actions">
-              <button type="button" className="btn btn-ghost hide-sm" onClick={() => refreshMany(state.roasters)} disabled={anyLoading} aria-label="Check for new coffees">
-                {anyLoading ? "Checking…" : "Refresh"}
+              <button type="button" className="btn btn-ghost" onClick={() => refreshMany(state.roasters)} disabled={anyLoading} aria-label="Check for new coffees">
+                <span aria-hidden="true">↻</span><span className="hide-sm">{anyLoading ? "Checking…" : "Refresh"}</span>
               </button>
               <button type="button" className="btn" onClick={() => setDialog("manage")}>
-                Roasters <span className="count">{state.roasters.length}</span>
+                Roasters <span className="hide-sm">({state.roasters.length})</span>
               </button>
               <button type="button" className="btn btn-primary" onClick={() => setDialog("add")} aria-label="Follow a roaster">
-                Follow
+                + <span className="hide-sm" aria-hidden="true">Follow</span>
               </button>
             </div>
           )}
@@ -216,9 +245,16 @@ export function Feed() {
           </p>
         )}
 
+        {shareNote && (
+          <p className="notice" role="status">
+            {shareNote}{" "}
+            <button type="button" className="btn btn-ghost" style={{ minHeight: 28 }} onClick={() => setShareNote(null)}>OK</button>
+          </p>
+        )}
+
         {pendingImport && (
           <div className="banner" role="status">
-            <span>Someone shared a list of <strong>{pendingImport.length} roaster{pendingImport.length === 1 ? "" : "s"}</strong>: {pendingImport.slice(0, 4).map((r) => r.name).join(", ")}{pendingImport.length > 4 ? "…" : ""}</span>
+            <span>This link has <strong>{pendingImport.length} roaster{pendingImport.length === 1 ? "" : "s"}</strong> to follow: {pendingImport.slice(0, 4).map((r) => r.name).join(", ")}{pendingImport.length > 4 ? "…" : ""}</span>
             <button type="button" className="btn btn-primary" onClick={importShared}>Follow them</button>
             <button type="button" className="btn btn-ghost" style={{ marginLeft: 0 }} onClick={() => setPendingImport(null)}>No thanks</button>
           </div>
@@ -251,7 +287,7 @@ export function Feed() {
               })}
             </nav>
             {(hiddenChips > 0 || chipsOpen) && (
-              <button type="button" className="text-btn more-roasters" aria-expanded={chipsOpen} onClick={() => setChipsOpen((o) => !o)}>
+              <button type="button" className="more-roasters" aria-expanded={chipsOpen} onClick={() => setChipsOpen((o) => !o)}>
                 {chipsOpen ? "Show fewer" : `+${hiddenChips} more`}
               </button>
             )}
@@ -269,7 +305,7 @@ export function Feed() {
               <div className="segmented" role="group" aria-label="Layout">
                 {(["grid", "list"] as ViewMode[]).map((v) => (
                   <button key={v} type="button" aria-pressed={state.prefs.view === v} onClick={() => setPref("view", v)} title={v === "grid" ? "Grid" : "List"}>
-                    {v === "grid" ? "Grid" : "List"}<span className="sr-only"> view</span>
+                    <span aria-hidden="true">{v === "grid" ? "▦" : "☰"}</span><span className="sr-only">{v === "grid" ? "Grid view" : "List view"}</span>
                   </button>
                 ))}
               </div>
@@ -328,6 +364,7 @@ export function Feed() {
           onRecolor={(id, color) => setState((s) => ({ ...s, roasters: s.roasters.map((r) => (r.id === id ? { ...r, color } : r)) }))}
           onRename={(id, name) => setState((s) => ({ ...s, roasters: s.roasters.map((r) => (r.id === id ? { ...r, name } : r)) }))}
           onRemove={removeRoaster}
+          onRemoveAll={removeAllRoasters}
           onRefresh={(id) => { const r = state.roasters.find((x) => x.id === id); if (r) refreshOne(r); }}
         />
       </Dialog>
@@ -336,36 +373,16 @@ export function Feed() {
 }
 
 function Welcome({ onAdd }: { onAdd: (url: string, name?: string) => Promise<void> }) {
-  const [adding, setAdding] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  async function quickAdd(name: string, url: string) {
-    setAdding(url);
-    setError(null);
-    try {
-      await onAdd(url, name);
-    } catch (err) {
-      setError(`${name}: ${err instanceof Error ? err.message : String(err)}`);
-    } finally {
-      setAdding(null);
-    }
-  }
-
   return (
     <section className="welcome">
-      <h1>New coffee from the roasters you follow.</h1>
-      <p>Paste a roaster&apos;s website. Their coffees show up here, newest first.</p>
+      <h1>Fresh coffees from roasters you love.</h1>
+      <p>Follow a few roasters and new bags show up here as soon as they land in their shops. No account needed.</p>
       <AddRoasterForm onAdd={onAdd} compact />
-      <div className="suggestions">
-        <span className="muted">Try</span>
-        {SUGGESTED_ROASTERS.map((s) => (
-          <button key={s.url} type="button" className="text-btn" disabled={adding !== null} onClick={() => quickAdd(s.name, s.url)}>
-            {adding === s.url ? "Adding…" : s.name}
-          </button>
-        ))}
-      </div>
-      <div aria-live="polite">{error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}</div>
-      <p className="welcome-note">No account. Your list is saved in this browser. Nothing is tracked.</p>
+      <ul className="privacy-points">
+        <li><strong>No sign-up</strong>Nothing to create, nothing to remember.</li>
+        <li><strong>Stays on your device</strong>Your roasters are saved in this browser only.</li>
+        <li><strong>No tracking</strong>No cookies, analytics or ads. Ever.</li>
+      </ul>
     </section>
   );
 }

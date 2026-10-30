@@ -34,7 +34,7 @@ export function AddRoasterForm({ onAdd, autoFocus, compact }: {
         <div className="add-form">
           <label htmlFor="quick-url" className="sr-only">Roaster website</label>
           <input id="quick-url" className="search" type="text" inputMode="url" autoComplete="off" autoCapitalize="off" spellCheck={false}
-            placeholder="Paste a roaster's website, e.g. onyxcoffeelab.com" value={url} onChange={(e) => setUrl(e.target.value)} autoFocus={autoFocus} />
+            placeholder="Paste a roaster's website or shop page" value={url} onChange={(e) => setUrl(e.target.value)} autoFocus={autoFocus} />
           <button className="btn btn-primary" disabled={busy || !url.trim()}>{busy ? "Looking…" : "Follow"}</button>
         </div>
         <div aria-live="polite">{error && <p className="error" style={{ marginTop: 10 }}>{error}</p>}</div>
