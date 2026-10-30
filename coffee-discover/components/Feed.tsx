@@ -1,0 +1,331 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { buildItems, filterAndSort, markSeen, type FeedItem } from "@/lib/feed";
+import type { Product, RoasterFeed } from "@/lib/scrapers/types";
+import { SITE_NAME, SUGGESTED_ROASTERS } from "@/lib/site";
+import {
+  beginVisit, decodeShare, emptyState, loadCache, loadState, saveCache, saveState,
+  type CachedFeed, type Prefs, type SavedRoaster, type SavedState, type SortMode,
+} from "@/lib/storage";
+import { AddRoasterForm } from "./AddRoasterForm";
+import { Dialog } from "./Dialog";
+import { ManageRoasters } from "./ManageRoasters";
+import { ProductCard, SkeletonCard } from "./ProductCard";
+
+export type RoasterStatus = { state: "loading" } | { state: "ok" } | { state: "error"; message: string };
+
+const STALE_MS = 20 * 60 * 1000;
+const CONCURRENCY = 4;
+
+async function requestFeed(params: Record<string, string>): Promise<RoasterFeed> {
+  const res = await fetch(`/api/roaster?${new URLSearchParams(params)}`);
+  const data = await res.json().catch(() => ({ error: "The server sent an unexpected response." }));
+  if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
+  return data as RoasterFeed;
+}
+
+function hostName(url: string): string {
+  try {
+    return new URL(url).hostname.replace(/^www\./, "");
+  } catch {
+    return url;
+  }
+}
+
+export function Feed() {
+  const [ready, setReady] = useState(false);
+  const [state, setState] = useState<SavedState>(emptyState);
+  const [cache, setCache] = useState<Record<string, CachedFeed>>({});
+  const [status, setStatus] = useState<Record<string, RoasterStatus>>({});
+  const [storageOk, setStorageOk] = useState(true);
+  const [query, setQuery] = useState("");
+  const [roasterFilter, setRoasterFilter] = useState<string | null>(null);
+  const [dialog, setDialog] = useState<"add" | "manage" | null>(null);
+  const [pendingImport, setPendingImport] = useState<Omit<SavedRoaster, "addedAt">[] | null>(null);
+  const [lastHidden, setLastHidden] = useState<string | null>(null);
+  const stateRef = useRef(state);
+  stateRef.current = state;
+
+  // ── Loading & saving ──────────────────────────────────────────────────────
+  const refreshOne = useCallback(async (r: SavedRoaster) => {
+    setStatus((s) => ({ ...s, [r.id]: { state: "loading" } }));
+    try {
+      const feed = await requestFeed({ url: r.feedUrl, platform: r.platform });
+      setCache((c) => ({ ...c, [r.id]: { fetchedAt: Date.now(), products: feed.products } }));
+      setState((s) => ({ ...s, seen: markSeen(s.seen, r.id, feed.products) }));
+      setStatus((s) => ({ ...s, [r.id]: { state: "ok" } }));
+    } catch (err) {
+      setStatus((s) => ({ ...s, [r.id]: { state: "error", message: err instanceof Error ? err.message : String(err) } }));
+    }
+  }, []);
+
+  const refreshMany = useCallback(async (roasters: SavedRoaster[]) => {
+    const queue = [...roasters];
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+      for (let r = queue.shift(); r; r = queue.shift()) await refreshOne(r);
+    }));
+  }, [refreshOne]);
+
+  useEffect(() => {
+    const loaded = beginVisit(loadState());
+    const cached = loadCache();
+    setState(loaded);
+    setCache(cached);
+    setStorageOk(saveState(loaded));
+    setReady(true);
+
+    const hash = new URLSearchParams(window.location.hash.slice(1)).get("follow");
+    if (hash) {
+      const incoming = decodeShare(hash).filter((r) => !loaded.roasters.some((x) => x.id === r.id));
+      if (incoming.length) setPendingImport(incoming);
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+    refreshMany(loaded.roasters.filter((r) => !cached[r.id] || Date.now() - cached[r.id].fetchedAt > STALE_MS));
+  }, [refreshMany]);
+
+  useEffect(() => {
+    if (ready) setStorageOk(saveState(state));
+  }, [state, ready]);
+
+  useEffect(() => {
+    if (!ready) return;
+    const ids = new Set(state.roasters.map((r) => r.id));
+    saveCache(Object.fromEntries(Object.entries(cache).filter(([id]) => ids.has(id))));
+  }, [cache, state.roasters, ready]);
+
+  // ── Actions ───────────────────────────────────────────────────────────────
+  async function addRoaster(url: string, name?: string) {
+    const feed = await requestFeed({ url });
+    const id = feed.source.feedUrl;
+    const existing = stateRef.current.roasters.find((r) => r.id === id);
+    if (existing) throw new Error(`You're already following ${existing.name}.`);
+    if (feed.products.length === 0) {
+      throw new Error("We reached the store but didn't find any coffees. Try the link to their coffee or shop page.");
+    }
+    const now = Date.now();
+    const roaster: SavedRoaster = {
+      id, name: name || feed.siteName || hostName(id), platform: feed.source.platform, feedUrl: id, addedAt: now,
+    };
+    setState((s) => ({ ...s, roasters: [...s.roasters, roaster], seen: markSeen(s.seen, id, feed.products, now) }));
+    setCache((c) => ({ ...c, [id]: { fetchedAt: now, products: feed.products } }));
+    setStatus((s) => ({ ...s, [id]: { state: "ok" } }));
+    setDialog(null);
+  }
+
+  function removeRoaster(id: string) {
+    const r = state.roasters.find((x) => x.id === id);
+    if (r && !window.confirm(`Unfollow ${r.name}?`)) return;
+    setState((s) => ({ ...s, roasters: s.roasters.filter((x) => x.id !== id) }));
+    if (roasterFilter === id) setRoasterFilter(null);
+  }
+
+  function importShared() {
+    if (!pendingImport) return;
+    const now = Date.now();
+    const added = pendingImport.map((r) => ({ ...r, addedAt: now }));
+    setState((s) => ({ ...s, roasters: [...s.roasters, ...added.filter((a) => !s.roasters.some((x) => x.id === a.id))] }));
+    setPendingImport(null);
+    refreshMany(added);
+  }
+
+  const setPref = <K extends keyof Prefs>(key: K, value: Prefs[K]) => setState((s) => ({ ...s, prefs: { ...s.prefs, [key]: value } }));
+
+  function hide(key: string) {
+    setState((s) => ({ ...s, hidden: [...s.hidden, key] }));
+    setLastHidden(key);
+  }
+
+  // ── Derived feed ──────────────────────────────────────────────────────────
+  const allItems: FeedItem[] = useMemo(() => state.roasters.flatMap((r) => {
+    const products: Product[] = cache[r.id]?.products ?? [];
+    return buildItems(r, products, state.seen[r.id] ?? {}, state.prevVisit);
+  }), [state.roasters, state.seen, state.prevVisit, cache]);
+
+  const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
+  const visible = useMemo(
+    () => filterAndSort(allItems, state.prefs, { roasterId: roasterFilter, query, hidden }),
+    [allItems, state.prefs, roasterFilter, query, hidden],
+  );
+  const countFor = (id: string | null) => filterAndSort(allItems, { ...state.prefs, newOnly: false }, { roasterId: id, query: "", hidden }).length;
+  const sinceLastVisit = allItems.filter((i) => i.sinceLastVisit && i.available && !hidden.has(i.key)).length;
+  const anyLoading = Object.values(status).some((s) => s.state === "loading");
+  const errors = state.roasters.filter((r) => status[r.id]?.state === "error");
+  const firstLoad = anyLoading && allItems.length === 0;
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  return (
+    <>
+      <header className="site-header">
+        <div className="wrap">
+          <a className="brand" href="/">
+            <img className="brand-mark" src="/icon.svg" alt="" />
+            {SITE_NAME}
+          </a>
+          {ready && state.roasters.length > 0 && (
+            <div className="header-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => refreshMany(state.roasters)} disabled={anyLoading} aria-label="Check for new coffees">
+                <span aria-hidden="true">↻</span><span className="hide-sm">{anyLoading ? "Checking…" : "Refresh"}</span>
+              </button>
+              <button type="button" className="btn" onClick={() => setDialog("manage")}>
+                Roasters <span className="hide-sm">({state.roasters.length})</span>
+              </button>
+              <button type="button" className="btn btn-primary" onClick={() => setDialog("add")}>
+                + <span className="hide-sm">Follow</span><span className="sr-only">a roaster</span>
+              </button>
+            </div>
+          )}
+        </div>
+      </header>
+
+      <main className="wrap">
+        {!storageOk && (
+          <p className="notice" role="status">
+            Your browser isn&apos;t letting this site save anything (private browsing, maybe?), so your roasters will be forgotten when you close this tab.
+          </p>
+        )}
+
+        {pendingImport && (
+          <div className="banner" role="status">
+            <span>Someone shared a list of <strong>{pendingImport.length} roaster{pendingImport.length === 1 ? "" : "s"}</strong>: {pendingImport.slice(0, 4).map((r) => r.name).join(", ")}{pendingImport.length > 4 ? "…" : ""}</span>
+            <button type="button" className="btn btn-primary" onClick={importShared}>Follow them</button>
+            <button type="button" className="btn btn-ghost" style={{ marginLeft: 0 }} onClick={() => setPendingImport(null)}>No thanks</button>
+          </div>
+        )}
+
+        {!ready ? null : state.roasters.length === 0 ? (
+          <Welcome onAdd={addRoaster} />
+        ) : (
+          <>
+            <nav className="roaster-bar" aria-label="Filter by roaster">
+              <button type="button" className="chip" aria-pressed={roasterFilter === null} onClick={() => setRoasterFilter(null)}>
+                All <span className="chip-count">{countFor(null)}</span>
+              </button>
+              {state.roasters.map((r) => {
+                const s = status[r.id]?.state;
+                return (
+                  <button key={r.id} type="button" className="chip" aria-pressed={roasterFilter === r.id}
+                    onClick={() => setRoasterFilter(roasterFilter === r.id ? null : r.id)}
+                    title={s === "error" ? `Couldn't update ${r.name}` : undefined}>
+                    {(s === "loading" || s === "error") && <span className={`chip-dot ${s}`} aria-hidden="true" />}
+                    {r.name} <span className="chip-count">{countFor(r.id)}</span>
+                  </button>
+                );
+              })}
+            </nav>
+
+            <div className="toolbar">
+              <label className="sr-only" htmlFor="search">Search coffees</label>
+              <input id="search" className="search" type="search" placeholder="Search origin, process, notes…" value={query} onChange={(e) => setQuery(e.target.value)} />
+              <label className="toggle">
+                <input type="checkbox" checked={state.prefs.newOnly} onChange={(e) => setPref("newOnly", e.target.checked)} /> New only
+              </label>
+              <label className="toggle">
+                <input type="checkbox" checked={!state.prefs.hideSoldOut} onChange={(e) => setPref("hideSoldOut", !e.target.checked)} /> Show sold out
+              </label>
+              <label className="sr-only" htmlFor="sort">Sort</label>
+              <select id="sort" className="select" value={state.prefs.sort} onChange={(e) => setPref("sort", e.target.value as SortMode)}>
+                <option value="newest">Newest first</option>
+                <option value="price-asc">Price: low to high</option>
+                <option value="price-desc">Price: high to low</option>
+                <option value="roaster">By roaster</option>
+              </select>
+            </div>
+
+            {sinceLastVisit > 0 && !state.prefs.newOnly && (
+              <div className="banner" role="status">
+                <span><strong>{sinceLastVisit} new coffee{sinceLastVisit === 1 ? "" : "s"}</strong> since your last visit.</span>
+                <button type="button" className="btn" onClick={() => setPref("newOnly", true)}>Show new only</button>
+              </div>
+            )}
+
+            {lastHidden && (
+              <p className="notice" role="status">
+                Hidden.{" "}
+                <button type="button" className="btn btn-ghost" style={{ minHeight: 28 }} onClick={() => {
+                  setState((s) => ({ ...s, hidden: s.hidden.filter((k) => k !== lastHidden) }));
+                  setLastHidden(null);
+                }}>Undo</button>
+              </p>
+            )}
+
+            {errors.length > 0 && !anyLoading && (
+              <p className="notice">
+                Couldn&apos;t update {errors.map((r) => r.name).join(", ")}. Showing what we had before.{" "}
+                <button type="button" className="btn btn-ghost" style={{ minHeight: 28 }} onClick={() => setDialog("manage")}>Details</button>
+              </p>
+            )}
+
+            {firstLoad ? (
+              <div className="grid">{Array.from({ length: 8 }, (_, i) => <SkeletonCard key={i} />)}</div>
+            ) : visible.length === 0 ? (
+              <p className="empty">
+                {query ? `Nothing matches “${query}”.` : state.prefs.newOnly ? "Nothing new right now. Check back soon." : "No coffees in stock right now."}
+              </p>
+            ) : (
+              <section className="grid" aria-label="Coffees">
+                {visible.map((item) => (
+                  <ProductCard key={item.key} item={item} onHide={() => hide(item.key)} onRoaster={() => setRoasterFilter(item.roasterId)} />
+                ))}
+              </section>
+            )}
+          </>
+        )}
+      </main>
+
+      <Dialog open={dialog === "add"} onClose={() => setDialog(null)} title="Follow a roaster">
+        <AddRoasterForm onAdd={addRoaster} autoFocus />
+      </Dialog>
+
+      <Dialog open={dialog === "manage"} onClose={() => setDialog(null)} title="Your roasters">
+        <ManageRoasters
+          roasters={state.roasters}
+          status={status}
+          fetchedAt={Object.fromEntries(Object.entries(cache).map(([id, c]) => [id, c.fetchedAt]))}
+          onRename={(id, name) => setState((s) => ({ ...s, roasters: s.roasters.map((r) => (r.id === id ? { ...r, name } : r)) }))}
+          onRemove={removeRoaster}
+          onRefresh={(id) => { const r = state.roasters.find((x) => x.id === id); if (r) refreshOne(r); }}
+        />
+      </Dialog>
+    </>
+  );
+}
+
+function Welcome({ onAdd }: { onAdd: (url: string, name?: string) => Promise<void> }) {
+  const [adding, setAdding] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  async function quickAdd(name: string, url: string) {
+    setAdding(url);
+    setError(null);
+    try {
+      await onAdd(url, name);
+    } catch (err) {
+      setError(`${name}: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      setAdding(null);
+    }
+  }
+
+  return (
+    <section className="welcome">
+      <h1>Fresh coffees from roasters you love.</h1>
+      <p>Follow a few roasters and new bags show up here as soon as they land in their shops. No account needed.</p>
+      <AddRoasterForm onAdd={onAdd} compact />
+      <p className="hint" style={{ fontSize: 14, margin: "20px 0 0" }}>Or start with one of these:</p>
+      <div className="suggestions">
+        {SUGGESTED_ROASTERS.map((s) => (
+          <button key={s.url} type="button" className="chip" disabled={adding !== null} onClick={() => quickAdd(s.name, s.url)}>
+            {adding === s.url ? "Adding…" : `+ ${s.name}`}
+          </button>
+        ))}
+      </div>
+      <div aria-live="polite">{error && <p className="error" style={{ marginTop: 12 }}>{error}</p>}</div>
+      <ul className="privacy-points">
+        <li><strong>No sign-up</strong>Nothing to create, nothing to remember.</li>
+        <li><strong>Stays on your device</strong>Your roasters are saved in this browser only.</li>
+        <li><strong>No tracking</strong>No cookies, analytics or ads. Ever.</li>
+      </ul>
+    </section>
+  );
+}
