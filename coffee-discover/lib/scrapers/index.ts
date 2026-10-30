@@ -3,7 +3,7 @@ import { collectSkipped, noteSkipped } from "./filter";
 import { fetchJsonLd } from "./jsonld";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
 import { fetchSquare, isSquareOnlineHtml } from "./square";
-import { fetchShopify, parseShopify, shopifyMeta, shopifyProductsEndpoint } from "./shopify";
+import { fetchShopify, parseShopify, shopifyProductsEndpoint } from "./shopify";
 import {
   SQUARESPACE_SHOP_GUESSES, fetchSquarespace, isSquarespaceProductPage, parseSquarespace, siteTitle, withFormatJson,
 } from "./squarespace";
@@ -141,13 +141,9 @@ async function detectFeedInner(rawUrl: string, followedMove = false): Promise<Ro
   // 1. Shopify and Big Cartel both answer /products.json (object vs array).
   const pj = await safeFetchJson(`${shopifyProductsEndpoint(url)}?limit=250`).catch(() => null);
   if (pj && Array.isArray((pj.data as { products?: unknown })?.products)) {
-    const meta = await shopifyMeta(url);
-    const source: FeedSource = { platform: "shopify", feedUrl: url };
-    if ((pj.data as { products: unknown[] }).products.length === 250) {
-      const full = await fetchShopify(url);
-      return finish(source, full.siteName, full.products);
-    }
-    return finish(source, meta.name, parseShopify(pj.data, url, meta.currency));
+    // The full fetch also reads the sitemap, which hides wholesale/private products.
+    const full = await fetchShopify(url);
+    return finish({ platform: "shopify", feedUrl: url }, full.siteName, full.products);
   }
   if (pj && isBigCartelList(pj.data)) {
     const full = await fetchBigCartel(url).catch(() => null);

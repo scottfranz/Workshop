@@ -12,6 +12,10 @@ type Routes = Record<string, { status?: number; body: unknown; type?: string; lo
 
 function mockSite(routes: Routes) {
   const calls: string[] = [];
+  // Shopify detection probes products.json, then does the full paged fetch.
+  for (const [url, route] of Object.entries(routes)) {
+    if (url.endsWith("/products.json?limit=250") && !routes[`${url}&page=1`]) routes[`${url}&page=1`] = route;
+  }
   vi.stubGlobal("fetch", vi.fn(async (input: URL | string) => {
     const url = String(input);
     calls.push(url);
@@ -39,6 +43,34 @@ describe("detectFeed", () => {
     expect(feed.siteName).toBe("Roaster Co");
     expect(feed.products).toHaveLength(2);
     expect(feed.skipped).toEqual(["Comandante C40 Grinder", "Digital Gift Card"]);
+  });
+
+  it("keeps paging past a short Shopify page", async () => {
+    const [guji, , , decaf] = fx.shopifyProducts.products;
+    mockSite({
+      "https://paged.example/products.json?limit=250": { body: { products: [guji] } },
+      "https://paged.example/products.json?limit=250&page=2": { body: { products: [decaf] } },
+      "https://paged.example/products.json?limit=250&page=3": { body: { products: [] } },
+    });
+    const feed = await detectFeed("paged.example");
+    expect(feed.products.map((p) => p.title).sort()).toEqual(["Colombia Decaf", "Ethiopia Guji Hambela"]);
+  });
+
+  it("reads the Shopify sitemap to hide private products", async () => {
+    mockSite({
+      "https://priv.example/products.json?limit=250": { body: fx.shopifyProducts },
+      "https://priv.example/products.json?limit=250&page=1": { body: fx.shopifyProducts },
+      "https://priv.example/sitemap.xml": { type: "application/xml", body: `<sitemapindex>
+        <sitemap><loc>https://priv.example/sitemap_products_1.xml?from=1&amp;to=9</loc></sitemap>
+        <sitemap><loc>https://priv.example/en-int/sitemap_products_1.xml?from=1&amp;to=9</loc></sitemap>
+        <sitemap><loc>https://priv.example/sitemap_pages_1.xml</loc></sitemap></sitemapindex>` },
+      "https://priv.example/sitemap_products_1.xml?from=1&to=9": { type: "application/xml", body: `<urlset>
+        <url><loc>https://priv.example/</loc></url>
+        <url><loc>https://priv.example/products/ethiopia-guji-hambela</loc></url></urlset>` },
+    });
+    const feed = await detectFeed("priv.example");
+    expect(feed.products.map((p) => p.title)).toEqual(["Ethiopia Guji Hambela"]);
+    expect(feed.skipped).toContain("Colombia Decaf");
   });
 
   it("detects Big Cartel's array-shaped products.json", async () => {
@@ -124,6 +156,9 @@ describe("resilience", () => {
     let attempts = 0;
     vi.stubGlobal("fetch", vi.fn(async (input: URL | string) => {
       const url = String(input);
+      if (url.startsWith("https://flaky.example/products.json") && url.includes("page=") && !url.endsWith("page=1")) {
+        return new Response(JSON.stringify({ products: [] }), { headers: { "content-type": "application/json" } });
+      }
       if (url.startsWith("https://flaky.example/products.json")) {
         attempts++;
         return attempts <= 2

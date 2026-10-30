@@ -15,8 +15,8 @@ describe.skipIf(urls.length === 0)("live stores", () => {
     console.log(
       `\n### ${url}\n  platform=${feed.source.platform} feedUrl=${feed.source.feedUrl} name=${JSON.stringify(feed.siteName)}` +
       `\n  products=${feed.products.length} in_stock=${inStock.length} skipped=${feed.skipped?.length ?? 0}` +
-      inStock.slice(0, 8).map((p) => `\n   + ${p.title} | ${p.price} ${p.currency} | ${p.url} | img=${p.image ? "yes" : "no"}`).join("") +
-      `\n   skipped: ${JSON.stringify(feed.skipped?.slice(0, 15))}`,
+      inStock.slice(0, Number(process.env.LIVE_SHOW ?? 8)).map((p) => `\n   + ${p.title} | ${p.price} ${p.currency} | ${p.url} | img=${p.image ? "yes" : "no"}`).join("") +
+      `\n   skipped: ${JSON.stringify(feed.skipped?.slice(0, Number(process.env.LIVE_SKIPPED ?? 15)))}`,
     );
     const q = process.env.LIVE_SEARCH?.toLowerCase();
     if (q) {
