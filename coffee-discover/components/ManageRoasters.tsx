@@ -19,7 +19,7 @@ export function ManageRoasters({ roasters, status, cache, onRename, onRecolor, o
   const [copied, setCopied] = useState(false);
   const shareUrl = typeof window === "undefined" || roasters.length === 0
     ? ""
-    : `${window.location.origin}/#follow=${encodeShare(roasters)}`;
+    : `${window.location.origin}/#${encodeShare(roasters)}`;
 
   async function copy() {
     try {
@@ -78,7 +78,7 @@ export function ManageRoasters({ roasters, status, cache, onRename, onRecolor, o
       )}
       <h3 style={{ margin: "0 0 6px", fontSize: 16 }}>Use your list on another device</h3>
       <p className="hint" style={{ margin: "0 0 10px" }}>
-        This link contains only your roasters&apos; names and web addresses. Open it on your phone or another browser to copy your list there.
+        This link holds only your roasters&apos; web addresses. Open it on your phone or in another browser and they&apos;re added there.
       </p>
       <div className="add-form">
         <label htmlFor="share-url" className="sr-only">Share link</label>

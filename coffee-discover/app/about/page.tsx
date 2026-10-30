@@ -22,7 +22,7 @@ export default function About() {
         </p>
         <p>
           Clearing your browser data will clear your list. To move your list to another device, use the share link under
-          <strong> Roasters</strong>. That link holds only roaster names and web addresses, in the part of the URL that browsers don&apos;t send to servers.
+          <strong> Roasters</strong>. Opening it adds those roasters to whatever you already follow. The link holds only the roasters&apos; web addresses, in the part of the URL that browsers don&apos;t send to servers.
         </p>
 
         <h2>What our server sees</h2>

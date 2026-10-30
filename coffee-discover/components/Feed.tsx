@@ -5,13 +5,24 @@ import { buildItems, filterAndSort, markSeen, type FeedItem } from "@/lib/feed";
 import type { Product, RoasterFeed } from "@/lib/scrapers/types";
 import { SITE_NAME } from "@/lib/site";
 import {
-  ROASTER_COLORS, beginVisit, decodeShare, emptyState, loadCache, loadState, pickColor, saveCache, saveState, withColors,
+  ROASTER_COLORS, beginVisit, decodeShare, emptyState, hasShareLink, loadCache, loadState, pickColor, sameRoasterUrl, saveCache,
+  saveState, type SharedRoaster,
   type CachedFeed, type Prefs, type SavedRoaster, type SavedState, type SortMode, type ViewMode,
 } from "@/lib/storage";
 import { AddRoasterForm } from "./AddRoasterForm";
 import { Dialog } from "./Dialog";
+import { LinkPreview } from "./LinkPreview";
 import { ManageRoasters } from "./ManageRoasters";
 import { ProductCard, SkeletonCard } from "./ProductCard";
+
+interface LinkImport {
+  total: number;
+  done: number;
+  added: string[];
+  failed: string[];
+  alreadyFollowing: number;
+  running: boolean;
+}
 
 export type RoasterStatus = { state: "loading" } | { state: "ok" } | { state: "error"; message: string };
 
@@ -41,8 +52,9 @@ export function Feed() {
   const [storageOk, setStorageOk] = useState(true);
   const [query, setQuery] = useState("");
   const [roasterFilter, setRoasterFilter] = useState<string | null>(null);
-  const [dialog, setDialog] = useState<"add" | "manage" | null>(null);
-  const [pendingImport, setPendingImport] = useState<Omit<SavedRoaster, "addedAt">[] | null>(null);
+  const [dialog, setDialog] = useState<"add" | "manage" | "link" | null>(null);
+  const [linkPreview, setLinkPreview] = useState<{ incoming: SharedRoaster[]; already: SharedRoaster[] } | null>(null);
+  const [linkImport, setLinkImport] = useState<LinkImport | null>(null);
   const [lastHidden, setLastHidden] = useState<string | null>(null);
   const [chipsOpen, setChipsOpen] = useState(false);
   const [shareNote, setShareNote] = useState<string | null>(null);
@@ -50,17 +62,9 @@ export function Feed() {
   const barRef = useRef<HTMLElement>(null);
   const stateRef = useRef(state);
   stateRef.current = state;
-
-  const readShareLink = useCallback(() => {
-    const encoded = new URLSearchParams(window.location.hash.slice(1)).get("follow");
-    if (!encoded) return;
-    history.replaceState(null, "", window.location.pathname + window.location.search);
-    const shared = decodeShare(encoded);
-    const following = new Set(stateRef.current.roasters.map((r) => r.id));
-    const incoming = shared.filter((r) => !following.has(r.id));
-    if (incoming.length) setPendingImport(incoming);
-    else setShareNote(shared.length ? "You already follow every roaster in that link." : "That share link looks incomplete. Try copying it again.");
-  }, []);
+  const adoptingRef = useRef<string[]>([]);
+  // Once additions are rendered into state, stateRef covers them.
+  useEffect(() => { adoptingRef.current = []; }, [state.roasters]);
 
   // ── Loading & saving ──────────────────────────────────────────────────────
   const refreshOne = useCallback(async (r: SavedRoaster) => {
@@ -80,6 +84,74 @@ export function Feed() {
     } catch (err) {
       setStatus((s) => ({ ...s, [r.id]: { state: "error", message: err instanceof Error ? err.message : String(err) } }));
     }
+  }, []);
+
+  /** Save a newly followed roaster plus the products we just fetched for it. */
+  const adopt = useCallback((roaster: Omit<SavedRoaster, "color">, feed: RoasterFeed | null): boolean => {
+    // Decide now, not inside the state updater (which React runs later), so callers
+    // get a real answer; adoptingRef covers additions not yet rendered.
+    const known = [...stateRef.current.roasters.map((r) => r.feedUrl), ...adoptingRef.current];
+    if (known.some((u) => sameRoasterUrl(u, roaster.feedUrl))) return false;
+    adoptingRef.current.push(roaster.feedUrl);
+    setState((s) => {
+      if (s.roasters.some((r) => r.id === roaster.id || sameRoasterUrl(r.feedUrl, roaster.feedUrl))) return s;
+      const saved: SavedRoaster = { ...roaster, color: pickColor(s.roasters.map((r) => r.color)) };
+      return { ...s, roasters: [...s.roasters, saved], seen: feed ? markSeen(s.seen, roaster.id, feed.products, roaster.addedAt) : s.seen };
+    });
+    if (feed) {
+      setCache((c) => ({ ...c, [roaster.id]: { fetchedAt: Date.now(), products: feed.products, skipped: feed.skipped } }));
+      setStatus((s) => ({ ...s, [roaster.id]: { state: "ok" } }));
+    }
+    return true;
+  }, []);
+
+  /** Follow everything in a share link right away; the banner offers Undo. */
+  const importShared = useCallback(async (entries: SharedRoaster[], alreadyFollowing: number) => {
+    const result: LinkImport = { total: entries.length, done: 0, added: [], failed: [], alreadyFollowing, running: true };
+    setLinkImport({ ...result });
+    const queue = [...entries];
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
+      for (let e = queue.shift(); e; e = queue.shift()) {
+        try {
+          // Old links carry name and platform; new ones are just addresses, so detect.
+          const feed = await requestFeed(e.platform ? { url: e.url, platform: e.platform } : { url: e.url });
+          if (feed.products.length === 0) throw new Error("no coffees");
+          const id = feed.source.feedUrl;
+          const roaster = { id, name: e.name || feed.siteName || hostName(id), platform: feed.source.platform, feedUrl: id, addedAt: Date.now() };
+          if (adopt(roaster, feed)) result.added.push(id);
+          else result.alreadyFollowing++;
+        } catch {
+          result.failed.push(hostName(e.url));
+        }
+        result.done++;
+        setLinkImport({ ...result });
+      }
+    }));
+    result.running = false;
+    setLinkImport({ ...result });
+  }, [adopt]);
+
+  const readShareLink = useCallback(() => {
+    const hash = window.location.hash;
+    if (!hasShareLink(hash)) return;
+    history.replaceState(null, "", window.location.pathname + window.location.search);
+    setLinkImport(null);
+    setShareNote(null);
+    const shared = decodeShare(hash);
+    if (shared.length === 0) {
+      setShareNote("That share link looks incomplete. Try copying it again.");
+      return;
+    }
+    const following = stateRef.current.roasters;
+    const isFollowed = (e: SharedRoaster) => following.some((r) => sameRoasterUrl(r.feedUrl, e.url));
+    const incoming = shared.filter((e) => !isFollowed(e));
+    if (incoming.length === 0) {
+      setShareNote(`You already follow ${shared.length === 1 ? "the roaster" : `all ${shared.length} roasters`} in that link.`);
+      return;
+    }
+    // Show the whole list and let the visitor choose before anything is added.
+    setLinkPreview({ incoming, already: shared.filter(isFollowed) });
+    setDialog("link");
   }, []);
 
   const refreshMany = useCallback(async (roasters: SavedRoaster[]) => {
@@ -145,19 +217,12 @@ export function Feed() {
   async function addRoaster(url: string, name?: string) {
     const feed = await requestFeed({ url });
     const id = feed.source.feedUrl;
-    const existing = stateRef.current.roasters.find((r) => r.id === id);
+    const existing = stateRef.current.roasters.find((r) => r.id === id || sameRoasterUrl(r.feedUrl, id));
     if (existing) throw new Error(`You're already following ${existing.name}.`);
     if (feed.products.length === 0) {
       throw new Error("We reached the store but didn't find any coffees. Try the link to their coffee or shop page.");
     }
-    const now = Date.now();
-    const roaster: SavedRoaster = {
-      id, name: name || feed.siteName || hostName(id), platform: feed.source.platform, feedUrl: id, addedAt: now,
-      color: pickColor(stateRef.current.roasters.map((r) => r.color)),
-    };
-    setState((s) => ({ ...s, roasters: [...s.roasters, roaster], seen: markSeen(s.seen, id, feed.products, now) }));
-    setCache((c) => ({ ...c, [id]: { fetchedAt: now, products: feed.products, skipped: feed.skipped } }));
-    setStatus((s) => ({ ...s, [id]: { state: "ok" } }));
+    adopt({ id, name: name || feed.siteName || hostName(id), platform: feed.source.platform, feedUrl: id, addedAt: Date.now() }, feed);
     setDialog(null);
   }
 
@@ -179,13 +244,12 @@ export function Feed() {
     setDialog(null);
   }
 
-  function importShared() {
-    if (!pendingImport) return;
-    const now = Date.now();
-    const added = pendingImport.map((r) => ({ ...r, addedAt: now }));
-    setState((s) => ({ ...s, roasters: withColors([...s.roasters, ...added.filter((a) => !s.roasters.some((x) => x.id === a.id))]) }));
-    setPendingImport(null);
-    refreshMany(added);
+  function undoImport() {
+    if (!linkImport) return;
+    const ids = new Set(linkImport.added);
+    setState((s) => ({ ...s, roasters: s.roasters.filter((r) => !ids.has(r.id)) }));
+    if (roasterFilter && ids.has(roasterFilter)) setRoasterFilter(null);
+    setLinkImport(null);
   }
 
   const setPref = <K extends keyof Prefs>(key: K, value: Prefs[K]) => setState((s) => ({ ...s, prefs: { ...s.prefs, [key]: value } }));
@@ -252,11 +316,25 @@ export function Feed() {
           </p>
         )}
 
-        {pendingImport && (
+        {linkImport && (
           <div className="banner" role="status">
-            <span>This link has <strong>{pendingImport.length} roaster{pendingImport.length === 1 ? "" : "s"}</strong> to follow: {pendingImport.slice(0, 4).map((r) => r.name).join(", ")}{pendingImport.length > 4 ? "…" : ""}</span>
-            <button type="button" className="btn btn-primary" onClick={importShared}>Follow them</button>
-            <button type="button" className="btn btn-ghost" style={{ marginLeft: 0 }} onClick={() => setPendingImport(null)}>No thanks</button>
+            {linkImport.running ? (
+              <span>Adding roasters from your link… {linkImport.done} of {linkImport.total}</span>
+            ) : (
+              <span>
+                {linkImport.added.length > 0
+                  ? <><strong>Added {linkImport.added.length} roaster{linkImport.added.length === 1 ? "" : "s"}</strong> from your link.</>
+                  : "No new roasters were added."}
+                {linkImport.alreadyFollowing > 0 && ` ${linkImport.alreadyFollowing} you already follow${linkImport.alreadyFollowing === 1 ? "s" : ""}.`}
+                {linkImport.failed.length > 0 && ` Couldn't reach ${linkImport.failed.join(", ")}.`}
+              </span>
+            )}
+            {!linkImport.running && linkImport.added.length > 0 && (
+              <button type="button" className="btn" onClick={undoImport}>Undo</button>
+            )}
+            {!linkImport.running && (
+              <button type="button" className="btn btn-ghost" style={{ marginLeft: linkImport.added.length ? 0 : undefined }} onClick={() => setLinkImport(null)}>OK</button>
+            )}
           </div>
         )}
 
@@ -351,6 +429,21 @@ export function Feed() {
           </>
         )}
       </main>
+
+      <Dialog open={dialog === "link"} onClose={() => { setDialog(null); setLinkPreview(null); }} title="Roasters from this link">
+        {linkPreview && (
+          <LinkPreview
+            incoming={linkPreview.incoming}
+            already={linkPreview.already}
+            onCancel={() => { setDialog(null); setLinkPreview(null); }}
+            onFollow={(selected) => {
+              setDialog(null);
+              setLinkPreview(null);
+              importShared(selected, 0);
+            }}
+          />
+        )}
+      </Dialog>
 
       <Dialog open={dialog === "add"} onClose={() => setDialog(null)} title="Follow a roaster">
         <AddRoasterForm onAdd={addRoaster} autoFocus />

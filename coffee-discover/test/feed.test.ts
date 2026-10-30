@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { buildItems, filterAndSort, markSeen, sizedImage } from "@/lib/feed";
-import { DEFAULT_PREFS, decodeShare, encodeShare, pruneSeen, type SavedRoaster, type SavedState } from "@/lib/storage";
+import { DEFAULT_PREFS, decodeShare, encodeShare, hasShareLink, pruneSeen, sameRoasterUrl, type SavedRoaster, type SavedState } from "@/lib/storage";
 import type { Product } from "@/lib/scrapers/types";
 
 const DAY = 86_400_000;
@@ -52,15 +52,35 @@ describe("filterAndSort", () => {
 });
 
 describe("storage helpers", () => {
-  it("round-trips share links, including unicode names", () => {
+  it("makes short share links from roaster addresses", () => {
     const list = [{ ...roaster, name: "Café Señor" }];
-    expect(decodeShare(encodeShare(list))).toEqual([{ id: roaster.feedUrl, name: "Café Señor", platform: "woocommerce", feedUrl: roaster.feedUrl }]);
+    const list2 = [...list, { ...roaster, id: "https://hex.coffee/collections/coffee", feedUrl: "https://hex.coffee/collections/coffee" }];
+    const link = encodeShare(list2);
+    expect(link).toBe("r=r.example,hex.coffee/collections/coffee");
+    expect(decodeShare("#" + link)).toEqual([{ url: "https://r.example" }, { url: "https://hex.coffee/collections/coffee" }]);
   });
   it("ignores malformed or unsafe share data", () => {
-    expect(decodeShare("not-base64!!")).toEqual([]);
+    expect(decodeShare("#follow=not-base64!!")).toEqual([]);
+    expect(hasShareLink("#follow=not-base64!!")).toBe(true);
+    expect(hasShareLink("#top")).toBe(false);
     const evil = btoa(JSON.stringify([["x", "shopify", "javascript:alert(1)"], ["y", "nope", "https://a.example"]]));
-    expect(decodeShare(evil)).toEqual([]);
+    expect(decodeShare("#follow=" + evil)).toEqual([]);
+    expect(decodeShare("#r=javascript:alert(1),ftp.example")).toEqual([{ url: "https://ftp.example" }]);
   });
+  it("still opens old long links, keeping names and platforms", () => {
+    const legacy = btoa(JSON.stringify([["Regalia Coffee", "shopify", "https://regaliacoffee.com"], ["Hex", "shopify", "https://hex.coffee/collections/cofefve"]]))
+      .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+    expect(decodeShare("#follow=" + legacy)).toEqual([
+      { url: "https://regaliacoffee.com", name: "Regalia Coffee", platform: "shopify" },
+      { url: "https://hex.coffee/collections/cofefve", name: "Hex", platform: "shopify" },
+    ]);
+  });
+
+  it("treats www, scheme, case and trailing slashes as the same roaster", () => {
+    expect(sameRoasterUrl("https://www.Tandemcoffee.com/", "tandemcoffee.com")).toBe(true);
+    expect(sameRoasterUrl("https://hex.coffee/collections/a", "https://hex.coffee/collections/b")).toBe(false);
+  });
+
   it("prunes seen entries for removed roasters and old products", () => {
     const state: SavedState = {
       version: 1 as const, roasters: [roaster], hidden: ["gone::1", `${roaster.id}::2`], lastVisit: null, prevVisit: null, prefs: DEFAULT_PREFS,
