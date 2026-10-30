@@ -18,6 +18,8 @@ describe.skipIf(urls.length === 0)("live stores", () => {
       inStock.slice(0, Number(process.env.LIVE_SHOW ?? 8)).map((p) => `\n   + ${p.title} | ${p.price} ${p.currency} | size=${p.size?.label ?? "?"} | ${p.url} | img=${p.image ? "yes" : "no"}`).join("") +
       `\n   skipped: ${JSON.stringify(feed.skipped?.slice(0, Number(process.env.LIVE_SKIPPED ?? 15)))}`,
     );
+    const kb = (x: unknown) => (JSON.stringify(x).length / 1024).toFixed(0);
+    console.log(`  saved size: ${kb(feed.products)} KB all → ${kb(inStock)} KB in stock only`);
     const q = process.env.LIVE_SEARCH?.toLowerCase();
     if (q) {
       const inTitle = inStock.filter((p) => p.title.toLowerCase().includes(q)).length;

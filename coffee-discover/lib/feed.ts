@@ -34,7 +34,7 @@ export function markSeen(seen: SavedState["seen"], roasterId: string, products: 
  */
 /** Sets, bundles, sample boxes and advent calendars: several coffees, so no single bag size. */
 export function isBundle(title: string): boolean {
-  return /\b(sets?|bundles?|box(es)?|advent|calendar|sampler|samplers|trio|duo|quartet|collection|tasting (menu|flight)|flight|discovery|variety pack|\d+\s*x\s*\d+)\b/i.test(title);
+  return /\b(sets?|bundles?|box(es)?|coffrets?|advent|avent|calendar|calendrier|adventskalender|julekalender|sampler|samplers|trio|duo|quartet|collection|tasting (menu|flight)|flight|discovery|variety pack|\d+\s*x\s*\d+)\b/i.test(title);
 }
 
 export function buildItems(

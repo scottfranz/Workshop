@@ -27,10 +27,14 @@ const NON_COFFEE_TITLE = [
   // not sold to the public: café, staff and partner products
   "cafe only", "café only", "cafes only", "staff only", "employee", "case pack", "white label",
   // brewing gear
-  "grinder", "dripper", "kettle", "scale", "filter", "filters", "carafe", "decanter", "brewer", "chemex", "aeropress",
+  "grinder", "grinders", "dripper", "drippers", "kettle", "scale", "filter", "filters", "carafe", "decanter", "brewer", "chemex", "aeropress",
   "v60", "kalita", "origami", "french press", "moka", "espresso machine", "tamper", "portafilter", "puck screen",
   "screen", "distribution tool", "distributor", "wdt", "leveler", "dosing cup", "dosing ring", "funnel", "knock box",
   "shaker", "cellar", "cellars",
+  // the same in French, German and Scandinavian shops
+  "moulin", "moulins", "meules", "bouilloire", "tasse", "tasses", "soucoupe", "théière", "cafetière", "pichet",
+  "verre", "cuillère", "brosse", "filtres", "casquette", "tablier", "mühle", "kaffeemühle", "wasserkocher", "waage",
+  "tasse", "kværn", "kvarn", "vægt", "våg", "kop", "kopp",
   "milk pitcher", "pitcher", "thermometer", "timer", "brush", "towel", "cleaner", "cleaning", "descaler", "cafiza",
   "urnex", "canister", "airscape", "bag clip", "scoop", "spoon", "stand", "tray",
   // water and minerals
@@ -48,6 +52,7 @@ const NON_COFFEE_TITLE = [
 ];
 
 const NON_COFFEE_TYPE = [
+  "matériel", "accessoire", "vaisselle", "zubehör", "udstyr", "utrustning",
   "merch", "apparel", "equipment", "gear", "accessor", "tool", "brewer", "brewing", "ware", "book", "water", "gift",
   "subscription", "tea", "kitchen", "supplies", "cleaning", "service", "class", "drink", "grinder", "machine",
   "dripper", "kettle", "scale", "music", "vinyl", "record", "rtd", "capsule", "cometeer", "chocolate", "cacao",

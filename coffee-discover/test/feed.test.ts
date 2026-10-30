@@ -165,11 +165,19 @@ describe("usual bag size", () => {
 
   it("doesn't give sets, bundles or advent calendars a bag size", async () => {
     const { isBundle } = await import("@/lib/feed");
-    for (const t of ["Vinka Set", "Discovery Box", "2026 Advent Calendar", "Best Seller's Collection", "Espresso Trio", "April Tasting Menu", "Blend Box"]) {
+    for (const t of ["Vinka Set", "Discovery Box", "2026 Advent Calendar", "Best Seller's Collection", "Espresso Trio", "April Tasting Menu", "Blend Box", "Calendrier de l’Avent", "Coffret découverte"]) {
       expect(isBundle(t)).toBe(true);
     }
     for (const t of ["Ethiopia Guji Hambela", "Sunset Blend", "Boxer Espresso", "Colombia Pink Bourbon"]) expect(isBundle(t)).toBe(false);
     const items = buildItems({ ...roaster, usualBagGrams: 250 }, [product("set", { title: "Vinka Set" }), product("single", { title: "Kenya Kiambu" })], {}, null, NOW);
     expect(items.map((i) => i.size?.grams ?? null)).toEqual([null, 250]);
+  });
+});
+
+describe("saved cache", () => {
+  it("keeps only in-stock coffees, and the rest of each entry", async () => {
+    const { compactCache } = await import("@/lib/storage");
+    const cache = { r: { fetchedAt: 5, skipped: ["Mug"], products: [product("in"), product("out", { available: false })] } };
+    expect(compactCache(cache)).toEqual({ r: { fetchedAt: 5, skipped: ["Mug"], products: [product("in")] } });
   });
 });

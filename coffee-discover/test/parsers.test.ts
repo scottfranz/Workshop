@@ -141,6 +141,10 @@ describe("coffee filter", () => {
     ["Salted Mocha RTD", {}],
     ["Forhåndsbetalt gaveabonnement", { options: ["Filter / 1 pose"] }],
     ["Gavekort", {}],
+    ["Tasse LUCID Blanche – Taille au choix", {}],
+    ["FM Grinders – Moulin Yoda 120", {}],
+    ["Bouilloire Stagg – Noir Mat", {}],
+    ["Ethiopia Guji", { productType: "Matériel" }],
     ["Kaffeabonnement Ethiopia", { productType: "Coffee", options: ["250g"] }],
     ["Panama Kotowa Las Brujas Washed - Cafe Only", { productType: "Coffee" }],
     ["Smiley Coffee Ludlow Blend - 10oz Case Pack", { productType: "Coffee" }],
@@ -169,6 +173,8 @@ describe("coffee filter", () => {
     ["Holiday", { productType: "Coffee" }],
     ["Whole Bean Sampler", {}],
     ["Kenya Kiambu", { productType: "Coffee", tags: ["coffee", "wholesale", "single origin"] }],
+    ["Finca la Riviera [Pink Bourbon]", { productType: "Cafés", options: ["200g"] }],
+    ["Gicherori AA [Washed]", { options: ["200g", "1kg"] }],
     ["Geometry", { productType: "Coffee", tags: ["coffee", "type:blend", "wholesale-coffee"], options: ["10oz", "10oz Case Pack (6)"] }],
   ])("keeps %s", (title, extra) => {
     expect(coffee(title, extra)).toBe(true);
