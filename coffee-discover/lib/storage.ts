@@ -15,7 +15,7 @@ export interface SavedRoaster {
   usualBagGrams?: number;
 }
 
-export type SortMode = "newest" | "price-asc" | "price-desc" | "per-cup" | "roaster";
+export type SortMode = "newest" | "price-asc" | "price-desc" | "per-cup" | "per-cup-desc" | "roaster";
 
 export type ViewMode = "grid" | "list";
 

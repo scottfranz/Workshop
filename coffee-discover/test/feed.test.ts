@@ -150,6 +150,8 @@ describe("price per cup", () => {
     ], {}, null, NOW);
     const sorted = filterAndSort(items, { ...DEFAULT_PREFS, sort: "per-cup" }, { roasterId: null, query: "", hidden: new Set() });
     expect(sorted.map((i) => i.id)).toEqual(["cheap-big", "pricey-small", "no-size"]);
+    const desc = filterAndSort(items, { ...DEFAULT_PREFS, sort: "per-cup-desc" }, { roasterId: null, query: "", hidden: new Set() });
+    expect(desc.map((i) => i.id)).toEqual(["pricey-small", "cheap-big", "no-size"]);
   });
 });
 

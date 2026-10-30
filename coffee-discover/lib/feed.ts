@@ -94,11 +94,17 @@ export function filterAndSort(
   });
   const common = (amount: number, currency: string | null) => (opts.toCommon ? opts.toCommon(amount, currency) : amount);
   const price = (i: FeedItem, missing: number) => (i.price === null ? missing : common(i.price, i.currency));
-  const cup = (i: FeedItem) => { const c = pricePerCup(i, prefs.cupGrams); return c === null ? Infinity : common(c, i.currency); };
+  const cup = (i: FeedItem) => { const c = pricePerCup(i, prefs.cupGrams); return c === null ? null : common(c, i.currency); };
+  // Coffees without a known size sort last either way.
+  const byCup = (dir: 1 | -1) => (a: FeedItem, b: FeedItem) => {
+    const ca = cup(a), cb = cup(b);
+    return ca === null ? (cb === null ? 0 : 1) : cb === null ? -1 : (ca - cb) * dir;
+  };
   switch (prefs.sort) {
     case "price-asc": return out.sort((a, b) => price(a, Infinity) - price(b, Infinity));
     case "price-desc": return out.sort((a, b) => price(b, -1) - price(a, -1));
-    case "per-cup": return out.sort((a, b) => cup(a) - cup(b));
+    case "per-cup": return out.sort(byCup(1));
+    case "per-cup-desc": return out.sort(byCup(-1));
     case "roaster": return out.sort((a, b) => a.roasterName.localeCompare(b.roasterName) || b.arrivedAt - a.arrivedAt);
     default: return out.sort((a, b) => b.arrivedAt - a.arrivedAt);
   }
