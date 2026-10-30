@@ -11,12 +11,27 @@ import {
 } from "@/lib/storage";
 import { AddRoasterForm } from "./AddRoasterForm";
 import { Dialog } from "./Dialog";
+import { convert, formatMoney, type Rates } from "@/lib/money";
 import { LinkPreview, type PickedRoaster } from "./LinkPreview";
 import { ManageRoasters } from "./ManageRoasters";
 import { ProductCard, SkeletonCard } from "./ProductCard";
 
 interface LinkImport {
   added: string[];
+}
+
+// Currencies the European Central Bank publishes rates for.
+const CURRENCIES = ["USD", "CAD", "EUR", "GBP", "AUD", "NZD", "JPY", "KRW", "CHF", "SEK", "NOK", "DKK", "SGD", "HKD", "MXN", "BRL", "CNY", "INR", "PLN", "CZK", "ZAR"];
+const RATES_KEY = "beanfeed:rates:v1";
+const RATES_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+function loadSavedRates(): Rates | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RATES_KEY) ?? "null") as { at: number; rates: Rates } | null;
+    return saved && Date.now() - saved.at < RATES_MAX_AGE_MS ? saved.rates : null;
+  } catch {
+    return null;
+  }
 }
 
 export type RoasterStatus = { state: "loading" } | { state: "ok" } | { state: "error"; message: string };
@@ -53,6 +68,7 @@ export function Feed() {
   const [lastHidden, setLastHidden] = useState<string | null>(null);
   const [chipsOpen, setChipsOpen] = useState(false);
   const [shareNote, setShareNote] = useState<string | null>(null);
+  const [rates, setRates] = useState<Rates | null>(null);
   const [hiddenChips, setHiddenChips] = useState(0);
   const barRef = useRef<HTMLElement>(null);
   const stateRef = useRef(state);
@@ -253,9 +269,38 @@ export function Feed() {
   }), [state.roasters, state.seen, state.prevVisit, cache]);
 
   const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
+
+  // Exchange rates are only needed when converting, or when roasters price in
+  // different currencies (so price sorting compares like with like).
+  const feedCurrencies = useMemo(() => new Set(allItems.map((i) => i.currency).filter(Boolean)), [allItems]);
+  const needRates = state.prefs.currency !== null || feedCurrencies.size > 1;
+  useEffect(() => {
+    if (!needRates || rates) return;
+    const saved = loadSavedRates();
+    if (saved) { setRates(saved); return; }
+    fetch("/api/rates")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: Rates | null) => {
+        if (!data?.rates) return;
+        setRates(data);
+        try { localStorage.setItem(RATES_KEY, JSON.stringify({ at: Date.now(), rates: data })); } catch { /* ignore */ }
+      })
+      .catch(() => {});
+  }, [needRates, rates]);
+
+  const target = state.prefs.currency;
+  const money = useCallback(
+    (amount: number | null, currency: string | null, decimals?: number) => formatMoney(amount, currency, target, rates, decimals),
+    [target, rates],
+  );
+  // Sort in the chosen currency, or USD as a neutral yardstick.
+  const toCommon = useCallback(
+    (amount: number, currency: string | null) => (currency ? convert(amount, currency, target ?? "USD", rates) ?? amount : amount),
+    [target, rates],
+  );
   const visible = useMemo(
-    () => filterAndSort(allItems, state.prefs, { roasterId: roasterFilter, query, hidden }),
-    [allItems, state.prefs, roasterFilter, query, hidden],
+    () => filterAndSort(allItems, state.prefs, { roasterId: roasterFilter, query, hidden, toCommon }),
+    [allItems, state.prefs, roasterFilter, query, hidden, toCommon],
   );
   const countFor = (id: string | null) => filterAndSort(allItems, state.prefs, { roasterId: id, query: "", hidden }).length;
   const colorOf = (id: string) => state.roasters.find((r) => r.id === id)?.color ?? ROASTER_COLORS[0];
@@ -355,7 +400,19 @@ export function Feed() {
                 <option value="newest">Newest first</option>
                 <option value="price-asc">Price: low to high</option>
                 <option value="price-desc">Price: high to low</option>
+                <option value="per-cup">Price per cup: low to high</option>
                 <option value="roaster">By roaster</option>
+              </select>
+              <label className="cup-input" title="Grams of coffee per cup, for price per cup">
+                <input type="number" inputMode="decimal" min={5} max={60} step={0.5} value={state.prefs.cupGrams}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 5 && v <= 60) setPref("cupGrams", v); }} />
+                <span>g/cup</span>
+              </label>
+              <label className="sr-only" htmlFor="currency">Show prices in</label>
+              <select id="currency" className="select" value={target ?? ""} onChange={(e) => setPref("currency", e.target.value || null)}
+                title={rates?.date ? `Converted with European Central Bank rates from ${rates.date}` : undefined}>
+                <option value="">Store currency</option>
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
               <div className="segmented" role="group" aria-label="Layout">
                 {(["grid", "list"] as ViewMode[]).map((v) => (
@@ -398,7 +455,7 @@ export function Feed() {
             ) : (
               <section className={state.prefs.view} aria-label="Coffees">
                 {visible.map((item) => (
-                  <ProductCard key={item.key} item={item} color={colorOf(item.roasterId)} view={state.prefs.view}
+                  <ProductCard key={item.key} item={item} cupGrams={state.prefs.cupGrams} money={money} color={colorOf(item.roasterId)} view={state.prefs.view}
                     onHide={() => hide(item.key)} onRoaster={() => setRoasterFilter(item.roasterId)} />
                 ))}
               </section>

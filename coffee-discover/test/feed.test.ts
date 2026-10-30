@@ -132,3 +132,23 @@ describe("search", () => {
     expect(find("kenya natural")).toEqual([]);
   });
 });
+
+describe("price per cup", () => {
+  it("divides the bag price by the cups in it", async () => {
+    const { pricePerCup } = await import("@/lib/feed");
+    expect(pricePerCup({ price: 22.5, size: { grams: 340, label: "12 oz" } }, 15)).toBeCloseTo(0.993, 3);
+    expect(pricePerCup({ price: 28, size: { grams: 250, label: "250 g" } }, 20)).toBeCloseTo(2.24, 2);
+    expect(pricePerCup({ price: 22, size: null }, 15)).toBeNull();
+    expect(pricePerCup({ price: null, size: { grams: 250, label: "250 g" } }, 15)).toBeNull();
+  });
+
+  it("sorts cheapest per cup first, unknown sizes last", () => {
+    const items = buildItems(roaster, [
+      product("pricey-small", { price: 30, size: { grams: 250, label: "250 g" } }),   // $1.80/cup
+      product("cheap-big", { price: 40, size: { grams: 1000, label: "1 kg" } }),      // $0.60/cup
+      product("no-size", { price: 10 }),
+    ], {}, null, NOW);
+    const sorted = filterAndSort(items, { ...DEFAULT_PREFS, sort: "per-cup" }, { roasterId: null, query: "", hidden: new Set() });
+    expect(sorted.map((i) => i.id)).toEqual(["cheap-big", "pricey-small", "no-size"]);
+  });
+});

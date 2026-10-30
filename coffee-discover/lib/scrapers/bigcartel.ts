@@ -1,6 +1,6 @@
 import { keepCoffee, searchTextFor } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
-import { absoluteUrl, minPrice, summarize, toIso } from "./text";
+import { absoluteUrl, pickBag, summarize, toIso } from "./text";
 import type { Product } from "./types";
 
 interface BigCartelProduct {
@@ -36,7 +36,12 @@ export function parseBigCartel(data: unknown, feedUrl: string, currency: string 
       title,
       url: absoluteUrl(p.url, origin) ?? origin,
       image: absoluteUrl(p.images?.[0]?.url, origin),
-      price: minPrice([p.price, ...options.map((o) => o.price)]),
+      ...(() => {
+        const bag = options.length
+          ? pickBag(options.map((o) => ({ price: o.price, available: !o.sold_out, label: o.name ?? "" })), title)
+          : pickBag([{ price: p.price, label: title }]);
+        return { price: bag.price, size: bag.size };
+      })(),
       currency,
       available: p.status !== "sold-out" && (options.length === 0 || options.some((o) => !o.sold_out)),
       publishedAt: toIso(p.created_at),

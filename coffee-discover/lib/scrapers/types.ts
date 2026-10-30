@@ -1,3 +1,5 @@
+import type { BagSize } from "./text";
+
 export type Platform = "shopify" | "woocommerce" | "squarespace" | "square" | "bigcartel" | "jsonld";
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
@@ -15,8 +17,10 @@ export interface Product {
   title: string;
   url: string;
   image: string | null;
-  /** Lowest variant price, in major units (e.g. 19.5). */
+  /** Price of the bag a shopper would buy (see pickBag), in major units (e.g. 19.5). */
   price: number | null;
+  /** Size of that same bag, when the store says. */
+  size?: BagSize | null;
   currency: string | null;
   available: boolean;
   /** ISO timestamp when the store says the product was published, if known. */

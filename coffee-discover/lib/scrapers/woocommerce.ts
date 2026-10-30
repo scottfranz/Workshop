@@ -1,6 +1,6 @@
 import { keepCoffee, searchTextFor } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
-import { absoluteUrl, decodeEntities, stripHtml, summarize, toNumber } from "./text";
+import { absoluteUrl, decodeEntities, isSampleSize, parseBagSize, stripHtml, summarize, toNumber, type BagSize } from "./text";
 import type { Product } from "./types";
 
 // Uses WooCommerce's public Store API, which needs no API keys.
@@ -26,6 +26,12 @@ export function wooCategoryFromUrl(feedUrl: string): string | null {
   return m ? decodeURIComponent(m[1]) : null;
 }
 
+/** The Store API's price is the cheapest variation, which is normally the smallest real bag size. */
+function wooBagSize(title: string, options: string[]): BagSize | null {
+  const sizes = options.filter((o) => !isSampleSize(o)).map(parseBagSize).filter((s): s is BagSize => s !== null);
+  return parseBagSize(title) ?? (sizes.length ? sizes.reduce((a, b) => (b.grams < a.grams ? b : a)) : null);
+}
+
 export function parseWooCommerce(data: unknown, feedUrl: string): Product[] {
   if (!Array.isArray(data)) return [];
   const category = wooCategoryFromUrl(feedUrl);
@@ -48,6 +54,7 @@ export function parseWooCommerce(data: unknown, feedUrl: string): Product[] {
       url: absoluteUrl(p.permalink, feedUrl) ?? feedUrl,
       image: absoluteUrl(p.images?.[0]?.src, feedUrl),
       price: cents !== null && cents > 0 ? cents / 10 ** minor : null,
+      size: wooBagSize(title, options),
       currency: p.prices?.currency_code ?? null,
       available: p.is_in_stock !== false,
       publishedAt: null,

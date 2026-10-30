@@ -65,7 +65,8 @@ describe("squarespace", () => {
 
   it("parses 7.1 priceMoney variants, sale prices and stock", () => {
     const [peru] = parseSquarespace(fx.squarespace71Page, "https://modern.example/store");
-    expect(peru).toMatchObject({ price: 20, currency: "CAD", available: true, publishedAt: new Date(1760000000000).toISOString() });
+    // The $20 sale size is out of stock; the in-stock size is $40.
+    expect(peru).toMatchObject({ price: 40, currency: "CAD", available: true, publishedAt: new Date(1760000000000).toISOString() });
   });
 
   it("does not treat a regular page as a shop", () => {
@@ -261,5 +262,35 @@ describe("search text", () => {
     expect(text).toContain("single origin");
     expect(text).toContain("12oz");
     expect(text.length).toBeLessThan(700);
+  });
+});
+
+describe("bag size", () => {
+  it.each([
+    ["250g", 250, "250 g"], ["12oz", 340, "12 oz"], ["2lbs", 907, "2 lb"], ["1kg / Whole Bean", 1000, "1 kg"],
+    ["200G", 200, "200 g"], ["8oz / Decaf", 227, "8 oz"], ["2.5kg", 2500, "2.5 kg"], ["10 ounces", 283, "10 oz"],
+  ])("%s → %ig", async (label, grams, nice) => {
+    const { parseBagSize } = await import("@/lib/scrapers/text");
+    expect(parseBagSize(label)).toEqual({ grams, label: nice });
+  });
+
+  it.each(["Default Title", "58mm", "Whole Bean", "Pack of 6", "5g", "Natural"])("%s has no bag size", async (label) => {
+    const { parseBagSize } = await import("@/lib/scrapers/text");
+    expect(parseBagSize(label)).toBeNull();
+  });
+
+  it("prices and sizes the same bag: in stock, not a sample, cheapest", async () => {
+    const { pickBag } = await import("@/lib/scrapers/text");
+    expect(pickBag([
+      { price: "7.00", label: "40g" }, { price: "28.00", label: "250g" }, { price: "98.00", label: "1kg" }, { price: "20", label: "200g", available: false },
+    ])).toEqual({ price: 28, size: { grams: 250, label: "250 g" } });
+    expect(pickBag([{ price: "18", label: "Default Title" }], "Kenya Kiambu 12oz")).toEqual({ price: 18, size: { grams: 340, label: "12 oz" } });
+  });
+
+  it("is read from Shopify variants", () => {
+    const data = { products: [{ ...fx.shopifyProducts.products[0], variants: [
+      { title: "250g", price: "28.00", available: true }, { title: "40g", price: "7.00", available: true },
+    ] }] };
+    expect(parseShopify(data, "https://r.example")[0]).toMatchObject({ price: 28, size: { grams: 250, label: "250 g" } });
   });
 });

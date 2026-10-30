@@ -13,12 +13,16 @@ export interface SavedRoaster {
   color?: string;
 }
 
-export type SortMode = "newest" | "price-asc" | "price-desc" | "roaster";
+export type SortMode = "newest" | "price-asc" | "price-desc" | "per-cup" | "roaster";
 
 export type ViewMode = "grid" | "list";
 
 export interface Prefs {
   view: ViewMode;
+  /** Coffee per cup, for price-per-cup. */
+  cupGrams: number;
+  /** Show prices converted to this currency; null shows each store's own. */
+  currency: string | null;
   sort: SortMode;
 }
 
@@ -45,7 +49,8 @@ const STATE_KEY = "beanfeed:v1";
 const CACHE_KEY = "beanfeed:cache:v1";
 const SEEN_TTL_MS = 120 * 24 * 60 * 60 * 1000;
 
-export const DEFAULT_PREFS: Prefs = { view: "grid", sort: "newest" };
+export const DEFAULT_CUP_GRAMS = 15;
+export const DEFAULT_PREFS: Prefs = { view: "grid", sort: "newest", cupGrams: DEFAULT_CUP_GRAMS, currency: null };
 
 export function emptyState(): SavedState {
   return { version: 1, roasters: [], seen: {}, hidden: [], lastVisit: null, prevVisit: null, prefs: { ...DEFAULT_PREFS } };

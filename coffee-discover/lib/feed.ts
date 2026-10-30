@@ -67,7 +67,15 @@ function matchesQuery(i: FeedItem, query: string): boolean {
   return query.split(/\s+/).every((word) => haystack.includes(word));
 }
 
-export function filterAndSort(items: FeedItem[], prefs: Prefs, opts: { roasterId: string | null; query: string; hidden: Set<string> }): FeedItem[] {
+/**
+ * @param opts.toCommon converts an amount to one shared currency so roasters
+ *   pricing in different currencies sort fairly. Without it, amounts compare raw.
+ */
+export function filterAndSort(
+  items: FeedItem[],
+  prefs: Prefs,
+  opts: { roasterId: string | null; query: string; hidden: Set<string>; toCommon?: (amount: number, currency: string | null) => number },
+): FeedItem[] {
   const q = opts.query.trim().toLowerCase();
   const out = items.filter((i) => {
     if (opts.hidden.has(i.key)) return false;
@@ -76,21 +84,31 @@ export function filterAndSort(items: FeedItem[], prefs: Prefs, opts: { roasterId
     if (q && !matchesQuery(i, q)) return false;
     return true;
   });
-  const price = (i: FeedItem, missing: number) => i.price ?? missing;
+  const common = (amount: number, currency: string | null) => (opts.toCommon ? opts.toCommon(amount, currency) : amount);
+  const price = (i: FeedItem, missing: number) => (i.price === null ? missing : common(i.price, i.currency));
+  const cup = (i: FeedItem) => { const c = pricePerCup(i, prefs.cupGrams); return c === null ? Infinity : common(c, i.currency); };
   switch (prefs.sort) {
     case "price-asc": return out.sort((a, b) => price(a, Infinity) - price(b, Infinity));
     case "price-desc": return out.sort((a, b) => price(b, -1) - price(a, -1));
+    case "per-cup": return out.sort((a, b) => cup(a) - cup(b));
     case "roaster": return out.sort((a, b) => a.roasterName.localeCompare(b.roasterName) || b.arrivedAt - a.arrivedAt);
     default: return out.sort((a, b) => b.arrivedAt - a.arrivedAt);
   }
 }
 
-export function formatPrice(price: number | null, currency: string | null): string | null {
+/** Cost of one cup's worth of coffee from this bag, or null without a price and size. */
+export function pricePerCup(p: Pick<FeedItem, "price" | "size">, cupGrams: number): number | null {
+  if (p.price === null || !p.size || !(cupGrams > 0)) return null;
+  return (p.price * cupGrams) / p.size.grams;
+}
+
+export function formatPrice(price: number | null, currency: string | null, decimals?: number): string | null {
   if (price === null) return null;
+  const digits = decimals ?? (price % 1 === 0 ? 0 : 2);
   try {
-    return new Intl.NumberFormat(undefined, { style: "currency", currency: currency ?? "USD", maximumFractionDigits: price % 1 === 0 ? 0 : 2 }).format(price);
+    return new Intl.NumberFormat(undefined, { style: "currency", currency: currency ?? "USD", minimumFractionDigits: digits, maximumFractionDigits: digits }).format(price);
   } catch {
-    return price.toFixed(2);
+    return price.toFixed(digits);
   }
 }
 

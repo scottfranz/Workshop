@@ -93,3 +93,50 @@ export function preferLatin(text: string | null): string | null {
   const cleaned = kept.replace(/[\s.,:;\-\u2013\u2014|/]+$/, "").replace(/^[\s.,:;\-|/]+/, "").trim();
   return (cleaned.match(/[A-Za-z\u00c0-\u024f]/g)?.length ?? 0) >= 4 ? cleaned : text;
 }
+
+export interface BagSize {
+  grams: number;
+  /** As the roaster wrote it, tidied: "12 oz", "250 g", "2 lb", "1 kg". */
+  label: string;
+}
+
+const UNIT_GRAMS: Record<string, [number, string]> = {
+  g: [1, "g"], gr: [1, "g"], gram: [1, "g"], grams: [1, "g"], kg: [1000, "kg"], kilo: [1000, "kg"], kilos: [1000, "kg"],
+  oz: [28.3495, "oz"], ounce: [28.3495, "oz"], ounces: [28.3495, "oz"],
+  lb: [453.592, "lb"], lbs: [453.592, "lb"], pound: [453.592, "lb"], pounds: [453.592, "lb"],
+};
+
+/** "12oz", "250 g", "2lbs", "1kg / Whole Bean" → bag size, or null if there isn't one. */
+export function parseBagSize(text: string | null | undefined): BagSize | null {
+  if (!text) return null;
+  const m = text.match(/(\d+(?:[.,]\d+)?)\s*(kilos?|kg|grams?|gr|g|ounces?|oz|pounds?|lbs?)(?![a-z])/i);
+  if (!m) return null;
+  const n = parseFloat(m[1].replace(",", "."));
+  const [factor, unit] = UNIT_GRAMS[m[2].toLowerCase()];
+  const grams = Math.round(n * factor);
+  // Anything outside this range isn't a retail bag (or isn't a weight at all).
+  if (grams < 30 || grams > 30000) return null;
+  return { grams, label: `${Number.isInteger(n) ? n : n.toFixed(1).replace(/\.0$/, "")} ${unit}` };
+}
+
+export interface PricedOption {
+  price: unknown;
+  /** Variant/option name(s), where the bag size usually is. */
+  label: string;
+  available?: boolean;
+}
+
+/**
+ * The bag a shopper would actually buy: in stock if any are, not a tiny sample
+ * if bigger sizes exist, then the cheapest. Its price and size go together so
+ * price-per-cup is computed from the same bag.
+ */
+export function pickBag(options: PricedOption[], fallbackLabel?: string): { price: number | null; size: BagSize | null } {
+  const priced = options.map((o) => ({ ...o, value: toNumber(o.price) })).filter((o) => o.value !== null && o.value > 0);
+  if (priced.length === 0) return { price: null, size: parseBagSize(fallbackLabel) };
+  const inStock = priced.filter((o) => o.available !== false);
+  const pool = inStock.length ? inStock : priced;
+  const full = pool.filter((o) => !isSampleSize(o.label));
+  const best = (full.length ? full : pool).reduce((a, b) => (b.value! < a.value! ? b : a));
+  return { price: best.value, size: parseBagSize(best.label) ?? parseBagSize(fallbackLabel) };
+}
