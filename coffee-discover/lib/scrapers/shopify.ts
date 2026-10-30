@@ -1,4 +1,4 @@
-import { keepCoffee } from "./filter";
+import { keepCoffee, searchTextFor } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
 import { absoluteUrl, isSampleSize, minPrice, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
@@ -48,7 +48,8 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       ...(p.options ?? []).flatMap((o) => [o.name ?? "", ...(o.values ?? [])]),
       ...variants.map((v) => v.title ?? ""),
     ].filter((o) => o && o !== "Title" && o !== "Default Title");
-    if (!keepCoffee({ title, productType: p.product_type, tags, description: stripHtml(p.body_html), options })) continue;
+    const signals = { title, productType: p.product_type, tags, description: stripHtml(p.body_html), options };
+    if (!keepCoffee(signals)) continue;
     products.push({
       id: String(p.id),
       title,
@@ -59,6 +60,7 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       available: variants.length === 0 ? true : variants.some((v) => v.available !== false),
       publishedAt: toIso(p.published_at ?? p.created_at),
       description: summarize(p.body_html),
+      searchText: searchTextFor(signals),
     });
   }
   return products;

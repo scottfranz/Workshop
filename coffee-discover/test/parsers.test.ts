@@ -229,3 +229,15 @@ describe("other-market listings", () => {
     expect(dropOtherMarketListings(list)).toBe(list);
   });
 });
+
+describe("search text", () => {
+  it("captures process words from deep in the description", async () => {
+    const { searchTextFor } = await import("@/lib/scrapers/filter");
+    const long = "Tasting notes: peach and jasmine. " + "Lorem ipsum about the farm. ".repeat(40) + "This lot is Washed and dried on raised beds.";
+    const text = searchTextFor({ title: "Hambela", productType: "Coffee", tags: ["Single Origin"], description: long, options: ["12oz"] });
+    expect(text).toContain("washed");
+    expect(text).toContain("single origin");
+    expect(text).toContain("12oz");
+    expect(text.length).toBeLessThan(700);
+  });
+});

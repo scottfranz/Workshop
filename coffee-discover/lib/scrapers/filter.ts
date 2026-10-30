@@ -137,3 +137,21 @@ export function keepCoffee(input: ProductSignals): boolean {
   if (!ok) skippedLog.getStore()?.add(input.title);
   return ok;
 }
+
+const SEARCH_DESCRIPTION_CHARS = 500;
+
+/**
+ * Text the feed's search looks through. The card only shows a short snippet
+ * (usually tasting notes), so details like "washed" further down the
+ * description would otherwise be unsearchable. Kept compact because it's
+ * cached in the visitor's browser: the start of the description, plus any
+ * origin, variety or process words found anywhere in it.
+ */
+export function searchTextFor(s: ProductSignals): string {
+  const description = (s.description ?? "").replace(/\s+/g, " ").trim();
+  const keywords = [...ORIGINS, ...COFFEE_WORDS].filter((w) => hasPhrase(description, w));
+  return [s.productType, ...(s.tags ?? []), ...(s.options ?? []), description.slice(0, SEARCH_DESCRIPTION_CHARS), ...keywords]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}

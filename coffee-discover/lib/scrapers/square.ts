@@ -2,7 +2,7 @@
 // almost no product data. Each page does embed the store's user and site IDs,
 // and the storefront reads products from a public JSON API keyed by those.
 
-import { keepCoffee } from "./filter";
+import { keepCoffee, searchTextFor } from "./filter";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
 import { absoluteUrl, decodeEntities, stripHtml, summarize, toIso, toNumber } from "./text";
 import type { Product } from "./types";
@@ -55,7 +55,8 @@ export function parseSquare(data: unknown, feedUrl: string, currency: string | n
     if (category && !(p.categoryIds ?? []).includes(category)) continue;
     const description = stripHtml(p.short_description);
     const categoryNames = (p.categories?.data ?? []).map((c) => c.name ?? "").join(" ");
-    if (!keepCoffee({ title, productType: categoryNames, description })) continue;
+    const signals = { title, productType: categoryNames, description };
+    if (!keepCoffee(signals)) continue;
     const url = absoluteUrl(p.absolute_site_link ?? p.site_link, origin + "/");
     if (!url) continue;
     products.push({
@@ -68,6 +69,7 @@ export function parseSquare(data: unknown, feedUrl: string, currency: string | n
       available: p.badges?.out_of_stock !== true,
       publishedAt: toIso(p.created_date),
       description: summarize(p.short_description),
+      searchText: searchTextFor(signals),
     });
   }
   return products;

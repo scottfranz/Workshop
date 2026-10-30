@@ -1,4 +1,4 @@
-import { keepCoffee } from "./filter";
+import { keepCoffee, searchTextFor } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
 import { absoluteUrl, decodeEntities, stripHtml, summarize, toNumber } from "./text";
 import type { Product } from "./types";
@@ -38,7 +38,8 @@ export function parseWooCommerce(data: unknown, feedUrl: string): Product[] {
     const catText = cats.map((c) => c.name ?? c.slug ?? "").join(" ");
     const options = (p.attributes ?? []).flatMap((a) => [a.name ?? "", ...(a.terms ?? []).map((t) => t.name ?? "")]);
     const description = stripHtml(`${p.short_description ?? ""} ${p.description ?? ""}`);
-    if (!keepCoffee({ title, productType: catText, description, options })) continue;
+    const signals = { title, productType: catText, description, options };
+    if (!keepCoffee(signals)) continue;
     const minor = p.prices?.currency_minor_unit ?? 2;
     const cents = toNumber(p.prices?.price);
     products.push({
@@ -51,6 +52,7 @@ export function parseWooCommerce(data: unknown, feedUrl: string): Product[] {
       available: p.is_in_stock !== false,
       publishedAt: null,
       description: summarize(p.short_description || p.description),
+      searchText: searchTextFor(signals),
     });
   }
   return products;

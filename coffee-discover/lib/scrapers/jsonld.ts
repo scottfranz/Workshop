@@ -3,7 +3,7 @@
 // read that from the page, and if the page only lists products, we visit a
 // handful of product pages to read theirs.
 
-import { keepCoffee } from "./filter";
+import { keepCoffee, searchTextFor, type ProductSignals } from "./filter";
 import { FetchError, safeFetchText } from "./safeFetch";
 import { absoluteUrl, decodeEntities, minPrice, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
@@ -90,12 +90,17 @@ export function productFromNode(node: Node, pageUrl: string): Candidate | null {
   };
 }
 
-function isCoffee(c: Candidate): boolean {
-  return keepCoffee({ title: c.title, productType: c.category, description: stripHtml(c.fullDescription), options: c.signals });
+function signalsOf(c: Candidate): ProductSignals {
+  return { title: c.title, productType: c.category, description: stripHtml(c.fullDescription), options: c.signals };
 }
 
-function toProduct({ category: _c, signals: _s, fullDescription: _d, ...product }: Candidate): Product {
-  return product;
+function isCoffee(c: Candidate): boolean {
+  return keepCoffee(signalsOf(c));
+}
+
+function toProduct(c: Candidate): Product {
+  const { category: _c, signals: _s, fullDescription: _d, ...product } = c;
+  return { ...product, searchText: searchTextFor(signalsOf(c)) };
 }
 
 export function productsFromHtml(html: string, pageUrl: string): { products: Product[]; listUrls: string[] } {

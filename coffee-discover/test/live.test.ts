@@ -18,6 +18,12 @@ describe.skipIf(urls.length === 0)("live stores", () => {
       inStock.slice(0, 8).map((p) => `\n   + ${p.title} | ${p.price} ${p.currency} | ${p.url} | img=${p.image ? "yes" : "no"}`).join("") +
       `\n   skipped: ${JSON.stringify(feed.skipped?.slice(0, 15))}`,
     );
+    const q = process.env.LIVE_SEARCH?.toLowerCase();
+    if (q) {
+      const inTitle = inStock.filter((p) => p.title.toLowerCase().includes(q)).length;
+      const anywhere = inStock.filter((p) => `${p.title} ${p.description ?? ""} ${p.searchText ?? ""}`.toLowerCase().includes(q)).length;
+      console.log(`  search "${q}": ${inTitle} in title only → ${anywhere} with full search`);
+    }
     expect(feed.products.length).toBeGreaterThan(0);
   }, 120_000);
 });

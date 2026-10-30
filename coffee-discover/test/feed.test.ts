@@ -95,3 +95,20 @@ describe("visits", () => {
     expect(beginVisit(first, 1_000 + 2 * 60 * 60 * 1000)).toMatchObject({ prevVisit: 1_000 });
   });
 });
+
+describe("search", () => {
+  const items = buildItems(roaster, [
+    product("a", { title: "Kenya Kiambu", description: "Blackcurrant, tomato", searchText: "coffee washed sl28 grown at 1,800 masl" }),
+    product("b", { title: "Ethiopia Guji", description: "Peach, jasmine", searchText: "coffee natural heirloom" }),
+    product("c", { title: "Washed Colombia", description: "Caramel" }),
+  ], {}, null, NOW);
+  const find = (q: string) => filterAndSort(items, DEFAULT_PREFS, { roasterId: null, query: q, hidden: new Set() }).map((i) => i.id).sort();
+
+  it("matches process details that only appear in the full description", () => {
+    expect(find("washed")).toEqual(["a", "c"]);
+  });
+  it("requires every word, in any order", () => {
+    expect(find("washed kenya")).toEqual(["a"]);
+    expect(find("kenya natural")).toEqual([]);
+  });
+});
