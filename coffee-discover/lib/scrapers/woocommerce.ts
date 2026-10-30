@@ -73,15 +73,19 @@ export async function fetchWooCommerce(feedUrl: string): Promise<{ products: Pro
   const origin = new URL(feedUrl).origin;
   const site = await safeFetchJson(`${origin}/wp-json/`).catch(() => null);
   const siteName = (site?.data as { name?: string } | undefined)?.name ?? null;
-  const products: Product[] = [];
-  for (let page = 1; page <= 5; page++) {
-    const res = await safeFetchJson(`${wooEndpoint(feedUrl)}?per_page=100&page=${page}&orderby=date&order=desc`);
-    if (!res || !Array.isArray(res.data)) {
-      if (page === 1) throw new FetchError("This store's product feed isn't available.");
-      break;
+  // Some stores' servers give up building 100 products at once (Tanat returns an
+  // empty response), so step the page size down until the first page loads.
+  for (const size of [100, 50, 25]) {
+    const products: Product[] = [];
+    let ok = false;
+    for (let page = 1; page <= Math.ceil(500 / size); page++) {
+      const res = await safeFetchJson(`${wooEndpoint(feedUrl)}?per_page=${size}&page=${page}&orderby=date&order=desc`);
+      if (!res || !Array.isArray(res.data)) break;
+      ok = true;
+      products.push(...parseWooCommerce(res.data, feedUrl));
+      if (res.data.length < size) break;
     }
-    products.push(...parseWooCommerce(res.data, feedUrl));
-    if (res.data.length < 100) break;
+    if (ok) return { products, siteName };
   }
-  return { products, siteName };
+  throw new FetchError("This store's product feed isn't available.");
 }

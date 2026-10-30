@@ -165,7 +165,7 @@ describe("usual bag size", () => {
 
   it("doesn't give sets, bundles or advent calendars a bag size", async () => {
     const { isBundle } = await import("@/lib/feed");
-    for (const t of ["Vinka Set", "Discovery Box", "2026 Advent Calendar", "Best Seller's Collection", "Espresso Trio", "April Tasting Menu", "Blend Box"]) {
+    for (const t of ["Vinka Set", "Discovery Box", "2026 Advent Calendar", "Best Seller's Collection", "Espresso Trio", "April Tasting Menu", "Blend Box", "Calendrier de l’Avent", "Coffret découverte"]) {
       expect(isBundle(t)).toBe(true);
     }
     for (const t of ["Ethiopia Guji Hambela", "Sunset Blend", "Boxer Espresso", "Colombia Pink Bourbon"]) expect(isBundle(t)).toBe(false);
