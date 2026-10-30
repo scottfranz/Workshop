@@ -1,7 +1,7 @@
 import { fetchBigCartel, isBigCartelList, parseBigCartel } from "./bigcartel";
 import { collectSkipped, noteSkipped } from "./filter";
 import { fetchJsonLd } from "./jsonld";
-import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
+import { BLOCKED_MESSAGE, FetchError, isBlocked, parseJsonBody, safeFetchJson, safeFetchText } from "./safeFetch";
 import { fetchSquare, isSquareOnlineHtml } from "./square";
 import { fetchStorefront, isStorefrontHtml } from "./storefront";
 import { fetchShopify, parseShopify, shopifyProductsEndpoint } from "./shopify";
@@ -147,7 +147,11 @@ async function detectFeedInner(rawUrl: string, followedMove = false, opts: FeedO
   const origin = new URL(url).origin;
 
   // 1. Shopify and Big Cartel both answer /products.json (object vs array).
-  const pj = await safeFetchJson(`${shopifyProductsEndpoint(url)}?limit=250`).catch(() => null);
+  const probe = await safeFetchText(`${shopifyProductsEndpoint(url)}?limit=250`, "application/json").catch(() => null);
+  // Remember a refusal so the final error can say so instead of "try again".
+  let blocked = probe ? isBlocked(probe) : false;
+  const probeData = probe && probe.status < 300 ? parseJsonBody(probe.body) : null;
+  const pj = probeData === null ? null : { url: probe!.url, data: probeData };
   if (pj && Array.isArray((pj.data as { products?: unknown })?.products)) {
     // The full fetch also reads the sitemap, which hides wholesale/private products.
     const full = await fetchShopify(url, opts.currency);
@@ -169,6 +173,7 @@ async function detectFeedInner(rawUrl: string, followedMove = false, opts: FeedO
 
   // 3. Everything else needs the page itself.
   const page = await safeFetchText(url, "text/html");
+  if (isBlocked(page)) throw new FetchError(BLOCKED_MESSAGE, page.status);
   if (page.status >= 400) throw new FetchError(`The site returned an error (${page.status}). Is the link right?`, page.status);
   const html = page.body;
 
@@ -205,6 +210,7 @@ async function detectFeedInner(rawUrl: string, followedMove = false, opts: FeedO
   const generic = await fetchJsonLd(url, html);
   if (generic.products.length > 0) return finish({ platform: "jsonld", feedUrl: url }, generic.siteName, generic.products);
 
+  if (blocked) throw new FetchError(BLOCKED_MESSAGE);
   if (isShopifyHtml(html)) throw new FetchError("This Shopify store didn't share its product list just now. Try again in a minute.");
   throw new FetchError(
     "We couldn't find any coffees on that page. Try pasting the link to the roaster's shop or coffee page instead of the homepage.",

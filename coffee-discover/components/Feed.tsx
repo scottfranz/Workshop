@@ -20,7 +20,8 @@ interface LinkImport {
   added: string[];
 }
 
-const RATES_KEY = "beanfeed:rates:v1";
+// v2: rates now include currencies beyond the ECB's (e.g. AED), so drop older saved tables.
+const RATES_KEY = "beanfeed:rates:v2";
 const RATES_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 function loadSavedRates(): Rates | null {

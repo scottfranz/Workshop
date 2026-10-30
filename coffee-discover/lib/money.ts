@@ -1,13 +1,18 @@
 // Currency conversion for showing every roaster's prices in one currency.
 
-/** Currencies the European Central Bank publishes daily rates for (the common ones). */
-export const CURRENCIES = ["USD", "CAD", "EUR", "GBP", "AUD", "NZD", "JPY", "KRW", "CHF", "SEK", "NOK", "DKK", "SGD", "HKD", "MXN", "BRL", "CNY", "INR", "PLN", "CZK", "ZAR"];
+/** Display currencies offered in settings. Store prices in any currency the rates cover still convert. */
+export const CURRENCIES = [
+  "USD", "CAD", "EUR", "GBP", "AUD", "NZD", "JPY", "KRW", "CNY", "TWD", "HKD", "SGD", "THB", "IDR", "MYR", "PHP", "INR",
+  "AED", "SAR", "CHF", "SEK", "NOK", "DKK", "PLN", "CZK", "MXN", "BRL", "COP", "ZAR",
+];
 
 export interface Rates {
   base: string;
   date: string | null;
   /** Units of each currency per 1 base unit. */
   rates: Record<string, number>;
+  /** Where the rates came from, for the credit line. */
+  sources?: string[];
 }
 
 /** Convert between currencies; null if either rate is unknown. */

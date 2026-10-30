@@ -181,6 +181,17 @@ describe("detectFeed", () => {
     expect(feed.products.map((p) => p.title).sort()).toEqual(["Brazil", "Rwanda"]);
   });
 
+  it("says plainly when a store blocks automated readers", async () => {
+    const challenge = "<html><title>Attention Required! | Cloudflare</title></html>";
+    mockSite({
+      "https://blocked.example/products.json?limit=250": { status: 403, body: challenge },
+      "https://blocked.example/": { body: '<script src="//cdn.shopify.com/x.js"></script>' },
+    });
+    await expect(detectFeed("blocked.example")).rejects.toThrow(/blocks automated readers/);
+    mockSite({ "https://wall.example/products.json?limit=250": { status: 403, body: challenge }, "https://wall.example/": { status: 403, body: challenge } });
+    await expect(detectFeed("wall.example")).rejects.toThrow(/blocks automated readers/);
+  });
+
   it("explains when nothing can be found", async () => {
     mockSite({ "https://empty.example/": { body: "<html><title>Hi</title></html>" } });
     await expect(detectFeed("empty.example")).rejects.toThrow(/couldn't find any coffees/i);
