@@ -1,5 +1,5 @@
 import { fetchBigCartel, isBigCartelList, parseBigCartel } from "./bigcartel";
-import { collectSkipped } from "./filter";
+import { collectSkipped, noteSkipped } from "./filter";
 import { fetchJsonLd } from "./jsonld";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
 import { fetchShopify, parseShopify, shopifyMeta, shopifyProductsEndpoint } from "./shopify";
@@ -25,32 +25,24 @@ export function normalizeUrl(raw: string): string {
   return u.toString().replace(/\/$/, "");
 }
 
-const comparable = (title: string) => preferLatin(title).toLowerCase().replace(/\bscaj\b/g, "").replace(/[^a-z0-9]+/g, "");
-const imageKey = (src: string | null) => (src ? src.replace(/^https?:/, "").split("?")[0] : null);
-
 /**
- * Some roasters list the same coffee twice: once in English and once with a
- * bilingual (e.g. English + Japanese) title for another market. Drop the
- * bilingual copy when an English-only listing has the same name or photo.
+ * Roasters selling in several countries sometimes list products for another
+ * market (e.g. Regalia's Japanese SCAJ listings) that 404 for everyone else.
+ * When most of a catalogue has Latin-script titles, leave out the listings
+ * titled in Japanese/Chinese/Korean. Mostly-CJK catalogues are left alone.
  */
-export function dropBilingualDuplicates(products: Product[]): Product[] {
-  const latin = products.filter((p) => !CJK.test(p.title));
-  if (latin.length === 0 || latin.length === products.length) return products;
-  const names = latin.map((p) => comparable(p.title)).filter((n) => n.length >= 4);
-  const images = new Set(latin.map((p) => imageKey(p.image)).filter(Boolean));
-  return products.filter((p) => {
-    if (!CJK.test(p.title)) return true;
-    const name = comparable(p.title);
-    if (images.has(imageKey(p.image))) return false;
-    return !names.some((n) => n === name || (name.length >= 6 && (n.includes(name) || name.includes(n))));
-  });
+export function dropOtherMarketListings(products: Product[]): Product[] {
+  const foreign = products.filter((p) => CJK.test(p.title));
+  if (foreign.length === 0 || foreign.length * 2 >= products.length) return products;
+  for (const p of foreign) noteSkipped(p.title);
+  return products.filter((p) => !CJK.test(p.title));
 }
 
 function finish(source: FeedSource, siteName: string | null, products: Product[]): RoasterFeed {
   return {
     source,
     siteName,
-    products: dropBilingualDuplicates(products)
+    products: dropOtherMarketListings(products)
       .slice(0, MAX_PRODUCTS)
       .map((p) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
   };

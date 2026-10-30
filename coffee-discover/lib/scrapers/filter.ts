@@ -124,6 +124,10 @@ export async function collectSkipped<T>(fn: () => Promise<T>): Promise<[T, strin
   return [result, [...skipped].slice(0, 150)];
 }
 
+export function noteSkipped(title: string) {
+  skippedLog.getStore()?.add(title);
+}
+
 /** looksLikeCoffee, noting rejected titles for the current request. */
 export function keepCoffee(input: ProductSignals): boolean {
   const ok = looksLikeCoffee(input);

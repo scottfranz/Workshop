@@ -181,28 +181,26 @@ describe("bilingual text", () => {
   });
 });
 
-describe("bilingual duplicates", () => {
-  const p = (id: string, title: string, image: string | null = null) => ({
-    id, title, url: `https://r.example/${id}`, image, price: 20, currency: "USD", available: true, publishedAt: null, description: null,
+describe("other-market listings", () => {
+  const p = (id: string, title: string) => ({
+    id, title, url: `https://r.example/${id}`, image: null, price: 20, currency: "USD", available: true, publishedAt: null, description: null,
   });
 
-  it("keeps the English listing and drops its bilingual twin", async () => {
-    const { dropBilingualDuplicates } = await import("@/lib/scrapers");
-    const out = dropBilingualDuplicates([
-      p("1", "SCAJ - El Espejo"),
+  it("drops CJK-titled listings from a mostly English catalogue", async () => {
+    const { dropOtherMarketListings } = await import("@/lib/scrapers");
+    const out = dropOtherMarketListings([
+      p("1", "Ethiopia Guji"),
       p("2", "SCAJ - El Espejo. フィンカ・エル・エスペホ"),
-      p("3", "Fabio Caballero La Salvaje Washed Gesha"),
-      p("4", "SCAJ - Fabio Caballero COE Washed Gesha ラ•サルバヘ. ウォッシュド. ゲシャ", "https://cdn.shopify.com/a.jpg?v=2"),
-      p("5", "Red Honey Sidra", "https://cdn.shopify.com/a.jpg?v=1"),
-      p("6", "SCAJ - Vinka Washed Sidra ヴィンカ. ウォッシュド. シドラ"),
+      p("3", "Kenya Kiambu"),
+      p("4", "SCAJ - Vinka Washed Sidra ヴィンカ. ウォッシュド. シドラ"),
+      p("5", "Colombia Huila"),
     ]);
-    // 2 matches by name, 4 matches 5 by photo; 6 has no English twin so it stays.
-    expect(out.map((x) => x.id)).toEqual(["1", "3", "5", "6"]);
+    expect(out.map((x) => x.id)).toEqual(["1", "3", "5"]);
   });
 
-  it("leaves Japanese-only roasters alone", async () => {
-    const { dropBilingualDuplicates } = await import("@/lib/scrapers");
-    const list = [p("1", "エチオピア グジ"), p("2", "ケニア")];
-    expect(dropBilingualDuplicates(list)).toBe(list);
+  it("leaves mostly-Japanese roasters alone", async () => {
+    const { dropOtherMarketListings } = await import("@/lib/scrapers");
+    const list = [p("1", "エチオピア グジ"), p("2", "Kenya ケニア"), p("3", "Seasonal Blend")];
+    expect(dropOtherMarketListings(list)).toBe(list);
   });
 });

@@ -119,11 +119,18 @@ describe("resilience", () => {
     expect(feed.products).toHaveLength(2);
   });
 
-  it("cleans bilingual titles in the final feed", async () => {
+  it("leaves out other-market listings and reports them as skipped", async () => {
+    const base = fx.shopifyProducts.products[0];
     mockSite({
-      "https://jp.example/products.json?limit=250": { body: { products: [{ ...fx.shopifyProducts.products[0], title: "SCAJ - El Espejo. フィンカ・エル・エスペホ" }] } },
+      "https://jp.example/products.json?limit=250": { body: { products: [
+        { ...base, id: 1, handle: "a", title: "Ethiopia Guji" },
+        { ...base, id: 2, handle: "b", title: "Kenya Nyeri" },
+        { ...base, id: 3, handle: "c", title: "SCAJ - El Espejo. フィンカ・エル・エスペホ" },
+      ] } },
     });
-    expect((await detectFeed("jp.example")).products[0].title).toBe("SCAJ - El Espejo");
+    const feed = await detectFeed("jp.example");
+    expect(feed.products.map((x) => x.title)).toEqual(["Ethiopia Guji", "Kenya Nyeri"]);
+    expect(feed.skipped).toEqual(["SCAJ - El Espejo"]);
   });
 });
 
