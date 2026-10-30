@@ -1,5 +1,8 @@
 // Currency conversion for showing every roaster's prices in one currency.
 
+/** Currencies the European Central Bank publishes daily rates for (the common ones). */
+export const CURRENCIES = ["USD", "CAD", "EUR", "GBP", "AUD", "NZD", "JPY", "KRW", "CHF", "SEK", "NOK", "DKK", "SGD", "HKD", "MXN", "BRL", "CNY", "INR", "PLN", "CZK", "ZAR"];
+
 export interface Rates {
   base: string;
   date: string | null;

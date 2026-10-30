@@ -22,6 +22,7 @@ export interface ProductSignals {
 const NON_COFFEE_TITLE = [
   // gift cards, subscriptions, services
   "gift card", "giftcard", "e-gift", "gift certificate", "subscription", "subscribe", "sub", "membership",
+  "abonnement", "abonnemang", "abo", "gaveabonnement", "gavekort", "presentkort", "gutschein", "geschenkkarte", "carte cadeau",
   "class", "workshop", "ticket", "donation", "tip jar", "shipping protection", "route package", "wholesale",
   // not sold to the public: café, staff and partner products
   "cafe only", "café only", "cafes only", "staff only", "employee", "case pack", "white label",
@@ -29,6 +30,7 @@ const NON_COFFEE_TITLE = [
   "grinder", "dripper", "kettle", "scale", "filter", "filters", "carafe", "decanter", "brewer", "chemex", "aeropress",
   "v60", "kalita", "origami", "french press", "moka", "espresso machine", "tamper", "portafilter", "puck screen",
   "screen", "distribution tool", "distributor", "wdt", "leveler", "dosing cup", "dosing ring", "funnel", "knock box",
+  "shaker", "cellar", "cellars",
   "milk pitcher", "pitcher", "thermometer", "timer", "brush", "towel", "cleaner", "cleaning", "descaler", "cafiza",
   "urnex", "canister", "airscape", "bag clip", "scoop", "spoon", "stand", "tray",
   // water and minerals
@@ -82,6 +84,21 @@ const DESCRIPTION_WORDS = [
   "light roast", "medium roast", "dark roast", "roast level", "roasted", "cup score",
 ];
 
+// Equipment makers whose products roasters resell. Matched against the vendor/brand.
+const GEAR_BRANDS = [
+  "weber workshops", "fellow", "hario", "kalita", "origami", "comandante", "1zpresso", "baratza", "timemore", "acaia",
+  "orea", "cafec", "normcore", "chemex", "aeropress", "bodum", "bonavita", "breville", "la marzocco", "lelit", "niche",
+  "eureka", "mazzer", "pullman", "decent espresso", "kinu", "option-o", "miir", "kinto", "loveramics", "notneutral",
+  "varia", "wilfa", "zerno", "mahlkönig", "mahlkonig", "ditting", "rhinowares",
+];
+
+// When the only hint of coffee is in the description, these mean it's gear or an event that talks about coffee.
+const GEAR_DESCRIPTION = [
+  "tool", "basket", "baskets", "paper filter", "filter paper", "filters", "grinder", "dripper", "brewer", "portafilter",
+  "tamper", "distribution", "dosing", "kettle", "scale", "event", "class", "workshop", "ticket", "rsvp", "dishwasher",
+  "stainless steel", "silicone", "made of", "compatible with",
+];
+
 const WEIGHT = /(^|[^a-z0-9])\d+(\.\d+)?\s?(oz|ounce|ounces|g|gr|gram|grams|lb|lbs|pound|pounds|kg|kilo)([^a-z]|$)/i;
 const GRIND = /whole bean|ground|grind|espresso grind|drip grind|pour over grind/i;
 
@@ -106,6 +123,8 @@ export function looksLikeCoffee(input: ProductSignals | string): boolean {
 
   // Hard no: the title names a non-coffee thing, or the store files it under gear/merch/books/etc.
   if (anyPhrase(titleForBlocklist, NON_COFFEE_TITLE) || hasPhrase(titleForBlocklist, "cup")) return false;
+  // Compound words (Norwegian/Danish/Swedish/German) hide these inside longer words: "kaffeabonnement".
+  if (/abonnement|abonnemang|gavekort|presentkort|gutschein/.test(title)) return false;
   // A gear word in the category wins, so "Coffee Equipment" or "Coffee Grinders" isn't coffee.
   if (type !== "" && NON_COFFEE_TYPE.some((w) => type.includes(w))) return false;
   const typeSaysCoffee = type !== "" && anyPhrase(type, COFFEE_TYPE);
@@ -115,13 +134,14 @@ export function looksLikeCoffee(input: ProductSignals | string): boolean {
   // many roasters tag retail coffees that way so they also appear in a wholesale portal.)
   if (/(^|\|\s*)(white[- ]label|cafe[- ]only|café[- ]only|utility[- ]sku|private|unlisted|hidden)(\s*\||$)/.test(tags)) return false;
   if (/wholesale/i.test(s.vendor ?? "")) return false;
+  if (s.vendor && anyPhrase(s.vendor.toLowerCase(), GEAR_BRANDS)) return false;
 
   // Yes if anything positively says coffee.
   if (typeSaysCoffee) return true;
   if (WEIGHT.test(options) || GRIND.test(options)) return true;
   if (anyPhrase(title, ORIGINS) || anyPhrase(title, COFFEE_WORDS) || hasPhrase(title, "coffee")) return true;
   if (anyPhrase(tags, ORIGINS) || anyPhrase(tags, COFFEE_WORDS)) return true;
-  if (anyPhrase(description, DESCRIPTION_WORDS) || anyPhrase(description, ORIGINS)) return true;
+  if (anyPhrase(description, DESCRIPTION_WORDS) || anyPhrase(description, ORIGINS)) return !anyPhrase(description, GEAR_DESCRIPTION);
 
   // No evidence either way: leave it out rather than show gear.
   return false;

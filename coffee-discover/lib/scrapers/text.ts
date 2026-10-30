@@ -135,8 +135,14 @@ export function pickBag(options: PricedOption[], fallbackLabel?: string): { pric
   const priced = options.map((o) => ({ ...o, value: toNumber(o.price) })).filter((o) => o.value !== null && o.value > 0);
   if (priced.length === 0) return { price: null, size: parseBagSize(fallbackLabel) };
   const inStock = priced.filter((o) => o.available !== false);
-  const pool = inStock.length ? inStock : priced;
-  const full = pool.filter((o) => !isSampleSize(o.label));
+  let pool = (inStock.length ? inStock : priced).map((o) => ({ ...o, size: parseBagSize(o.label) }));
+  // A bag with a known weight beats a bundle or "set" without one.
+  const weighed = pool.filter((o) => o.size);
+  if (weighed.length) pool = weighed;
+  // Explicit samples ("Sample", "Taster") go, and so do tiny bags, but only when a
+  // bigger bag of the same coffee is on offer: some roasters sell rare lots in 75 g bags.
+  const biggest = Math.max(0, ...pool.map((o) => o.size?.grams ?? 0));
+  const full = pool.filter((o) => !/\bsample|\btaster|\btrial size/i.test(o.label) && !(o.size && o.size.grams < 100 && biggest >= 100));
   const best = (full.length ? full : pool).reduce((a, b) => (b.value! < a.value! ? b : a));
-  return { price: best.value, size: parseBagSize(best.label) ?? parseBagSize(fallbackLabel) };
+  return { price: best.value, size: best.size ?? parseBagSize(fallbackLabel) };
 }

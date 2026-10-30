@@ -20,8 +20,6 @@ interface LinkImport {
   added: string[];
 }
 
-// Currencies the European Central Bank publishes rates for.
-const CURRENCIES = ["USD", "CAD", "EUR", "GBP", "AUD", "NZD", "JPY", "KRW", "CHF", "SEK", "NOK", "DKK", "SGD", "HKD", "MXN", "BRL", "CNY", "INR", "PLN", "CZK", "ZAR"];
 const RATES_KEY = "beanfeed:rates:v1";
 const RATES_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
@@ -286,7 +284,8 @@ export function Feed() {
         try { localStorage.setItem(RATES_KEY, JSON.stringify({ at: Date.now(), rates: data })); } catch { /* ignore */ }
       })
       .catch(() => {});
-  }, [needRates, rates]);
+    // Re-run when the chosen currency changes, so a failed load gets another try.
+  }, [needRates, rates, state.prefs.currency]);
 
   const target = state.prefs.currency;
   const money = useCallback(
@@ -403,17 +402,6 @@ export function Feed() {
                 <option value="per-cup">Price per cup: low to high</option>
                 <option value="roaster">By roaster</option>
               </select>
-              <label className="cup-input" title="Grams of coffee per cup, for price per cup">
-                <input type="number" inputMode="decimal" min={5} max={60} step={0.5} value={state.prefs.cupGrams}
-                  onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 5 && v <= 60) setPref("cupGrams", v); }} />
-                <span>g/cup</span>
-              </label>
-              <label className="sr-only" htmlFor="currency">Show prices in</label>
-              <select id="currency" className="select" value={target ?? ""} onChange={(e) => setPref("currency", e.target.value || null)}
-                title={rates?.date ? `Converted with European Central Bank rates from ${rates.date}` : undefined}>
-                <option value="">Store currency</option>
-                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
-              </select>
               <div className="segmented" role="group" aria-label="Layout">
                 {(["grid", "list"] as ViewMode[]).map((v) => (
                   <button key={v} type="button" aria-pressed={state.prefs.view === v} onClick={() => setPref("view", v)} title={v === "grid" ? "Grid" : "List"}>
@@ -487,6 +475,11 @@ export function Feed() {
 
       <Dialog open={dialog === "manage"} onClose={() => setDialog(null)} title="Your roasters">
         <ManageRoasters
+          cupGrams={state.prefs.cupGrams}
+          currency={target}
+          ratesDate={rates?.date ?? null}
+          onCupGrams={(g) => setPref("cupGrams", g)}
+          onCurrency={(c) => setPref("currency", c)}
           roasters={state.roasters}
           status={status}
           cache={cache}

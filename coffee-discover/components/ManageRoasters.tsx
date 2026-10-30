@@ -3,10 +3,18 @@
 import { useState } from "react";
 import { timeAgo } from "@/lib/feed";
 import { PLATFORM_LABELS } from "@/lib/scrapers/types";
+import { CURRENCIES } from "@/lib/money";
 import { encodeShare, type CachedFeed, type SavedRoaster } from "@/lib/storage";
 import type { RoasterStatus } from "./Feed";
 
-export function ManageRoasters({ roasters, status, cache, onRename, onRecolor, onRemove, onRemoveAll, onRefresh }: {
+export function ManageRoasters({
+  roasters, status, cache, cupGrams, currency, ratesDate, onCupGrams, onCurrency, onRename, onRecolor, onRemove, onRemoveAll, onRefresh,
+}: {
+  cupGrams: number;
+  currency: string | null;
+  ratesDate: string | null;
+  onCupGrams: (grams: number) => void;
+  onCurrency: (currency: string | null) => void;
   roasters: SavedRoaster[];
   status: Record<string, RoasterStatus>;
   cache: Record<string, CachedFeed | undefined>;
@@ -76,6 +84,29 @@ export function ManageRoasters({ roasters, status, cache, onRename, onRecolor, o
           <button type="button" className="btn btn-ghost btn-danger" onClick={onRemoveAll}>Remove all roasters</button>
         </div>
       )}
+      <h3 style={{ margin: "0 0 10px", fontSize: 16 }}>Prices</h3>
+      <div className="settings">
+        <label className="setting">
+          <span>Coffee per cup</span>
+          <span className="cup-input">
+            <input type="number" inputMode="decimal" min={5} max={60} step={0.5} defaultValue={cupGrams}
+              onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 5 && v <= 60) onCupGrams(v); }} />
+            <span>g</span>
+          </span>
+        </label>
+        <label className="setting">
+          <span>Show prices in</span>
+          <select className="select" value={currency ?? ""} onChange={(e) => onCurrency(e.target.value || null)}>
+            <option value="">Each store&apos;s currency</option>
+            {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
+          </select>
+        </label>
+        <p className="hint" style={{ margin: 0 }}>
+          Price per cup uses the bag size each store lists.
+          {currency && <> Converted prices use European Central Bank rates{ratesDate ? ` from ${ratesDate}` : ""} and are marked ≈.</>}
+        </p>
+      </div>
+
       <h3 style={{ margin: "0 0 6px", fontSize: 16 }}>Use your list on another device</h3>
       <p className="hint" style={{ margin: "0 0 10px" }}>
         This link holds only your roasters&apos; web addresses. Open it on your phone or in another browser and they&apos;re added there.

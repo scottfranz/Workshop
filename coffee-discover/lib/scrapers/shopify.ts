@@ -105,7 +105,11 @@ export async function fetchShopify(feedUrl: string): Promise<{ products: Product
   const [meta, listed] = await Promise.all([shopifyMeta(feedUrl), shopifyListedHandles(feedUrl)]);
   const products: Product[] = [];
   for (let page = 1; page <= 6; page++) {
-    const res = await safeFetchJson(`${endpoint}?limit=250&page=${page}`);
+    // Stores using Shopify Markets price in the *visitor's* currency, guessed from
+    // where the request comes from (our servers are in the US), while meta.json
+    // gives the store's own. Ask for that one explicitly so the label is right.
+    const currencyParam = meta.currency ? `&currency=${encodeURIComponent(meta.currency)}` : "";
+    const res = await safeFetchJson(`${endpoint}?limit=250&page=${page}${currencyParam}`);
     const raw = (res?.data as { products?: unknown[] })?.products;
     if (!Array.isArray(raw)) {
       if (page === 1) throw new FetchError("This store's product feed isn't available.");
