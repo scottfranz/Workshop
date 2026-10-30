@@ -1,18 +1,33 @@
 "use client";
 
-import { formatPrice, sizedImage, type FeedItem } from "@/lib/feed";
+import { pricePerCup, sizedImage, type FeedItem } from "@/lib/feed";
+import type { Money } from "@/lib/money";
 import type { ViewMode } from "@/lib/storage";
 
 interface Props {
   item: FeedItem;
+  cupGrams: number;
+  /** Formats an amount in the visitor's chosen currency (or the store's). */
+  money: (amount: number | null, currency: string | null, decimals?: number) => Money | null;
   color: string;
   view: ViewMode;
   onHide: () => void;
   onRoaster: () => void;
 }
 
-export function ProductCard({ item, color, view, onHide, onRoaster }: Props) {
-  const price = formatPrice(item.price, item.currency);
+export function ProductCard({ item, cupGrams, money, color, view, onHide, onRoaster }: Props) {
+  const price = money(item.price, item.currency);
+  const cup = money(pricePerCup(item, cupGrams), item.currency, 2);
+  const perCup = cup && <span className="per-cup" title={`About ${cupGrams} g of coffee per cup${cup.original ? ` (${cup.original} in the store's currency)` : ""}`}>{cup.text}/cup</span>;
+  // "$22 · 12 oz", or just "$22" when the store doesn't say the size.
+  const priceLine = price
+    ? (
+      <span className="price">
+        <span title={price.original ? `${price.original} at the store` : undefined}>{price.text}</span>
+        {item.size && <span className="size"> · {item.size.label}</span>}
+      </span>
+    )
+    : <span className="muted">See price</span>;
   const image = sizedImage(item.image, view === "list" ? 160 : 600);
   const style = { "--rc": color } as React.CSSProperties;
   const status = !item.available && <span className="badge sold">Sold out</span>;
@@ -39,7 +54,8 @@ export function ProductCard({ item, color, view, onHide, onRoaster }: Props) {
           {item.description && <p className="card-desc row-desc">{item.description}</p>}
         </div>
         <div className="row-side">
-          <span className="price">{price ?? <span className="muted">See price</span>}</span>
+          {priceLine}
+          {perCup}
           {status}
         </div>
         {hide}
@@ -59,7 +75,8 @@ export function ProductCard({ item, color, view, onHide, onRoaster }: Props) {
         <h3 className="card-title">{title}</h3>
         {item.description && <p className="card-desc">{item.description}</p>}
         <div className="card-foot">
-          <span className="price">{price ?? <span className="muted">See price</span>}</span>
+          {priceLine}
+          {perCup}
           <span className="sr-only">Opens {item.roasterName}&apos;s site in a new tab</span>
         </div>
       </div>

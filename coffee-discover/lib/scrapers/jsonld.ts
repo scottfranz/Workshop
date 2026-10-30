@@ -5,7 +5,7 @@
 
 import { keepCoffee, searchTextFor, type ProductSignals } from "./filter";
 import { FetchError, safeFetchText } from "./safeFetch";
-import { absoluteUrl, decodeEntities, minPrice, stripHtml, summarize, toIso } from "./text";
+import { absoluteUrl, decodeEntities, minPrice, parseBagSize, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
 
 const MAX_PRODUCT_PAGES = 24;
@@ -75,6 +75,7 @@ export function productFromNode(node: Node, pageUrl: string): Candidate | null {
     url,
     image: absoluteUrl(firstImage(node.image), pageUrl),
     price: minPrice(offers.flatMap((o) => [o.price, o.lowPrice])),
+    size: parseBagSize(title) ?? (offers.length === 1 ? parseBagSize(String(offers[0].name ?? "")) : null),
     currency: (offers.find((o) => o.priceCurrency)?.priceCurrency as string) ?? null,
     available: availability.length === 0 || availability.some((a) => /InStock|PreOrder|LimitedAvailability|OnlineOnly/i.test(a)),
     publishedAt: toIso(node.releaseDate ?? node.datePublished),

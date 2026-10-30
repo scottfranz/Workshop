@@ -4,7 +4,7 @@
 
 import { keepCoffee, searchTextFor } from "./filter";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
-import { absoluteUrl, decodeEntities, stripHtml, summarize, toIso, toNumber } from "./text";
+import { absoluteUrl, decodeEntities, parseBagSize, stripHtml, summarize, toIso, toNumber } from "./text";
 import type { Product } from "./types";
 
 interface SquareProduct {
@@ -65,6 +65,8 @@ export function parseSquare(data: unknown, feedUrl: string, currency: string | n
       url,
       image: absoluteUrl(p.images?.data?.[0]?.absolute_url ?? p.thumbnail?.data?.absolute_url, origin),
       price: toNumber(p.price?.low ?? p.price?.low_with_modifiers),
+      // Square's list API has no per-size prices, so use the title or "…one 300g bag…" in the description.
+      size: parseBagSize(title) ?? parseBagSize(description.match(/\d+(?:\.\d+)?\s?(?:g|grams?|oz|ounces?|lbs?)\s+bags?\b/i)?.[0]),
       currency,
       available: p.badges?.out_of_stock !== true,
       publishedAt: toIso(p.created_date),

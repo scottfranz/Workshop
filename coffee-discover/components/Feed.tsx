@@ -11,17 +11,27 @@ import {
 } from "@/lib/storage";
 import { AddRoasterForm } from "./AddRoasterForm";
 import { Dialog } from "./Dialog";
-import { LinkPreview } from "./LinkPreview";
+import { convert, formatMoney, type Rates } from "@/lib/money";
+import { LinkPreview, type PickedRoaster } from "./LinkPreview";
 import { ManageRoasters } from "./ManageRoasters";
 import { ProductCard, SkeletonCard } from "./ProductCard";
 
 interface LinkImport {
-  total: number;
-  done: number;
   added: string[];
-  failed: string[];
-  alreadyFollowing: number;
-  running: boolean;
+}
+
+// Currencies the European Central Bank publishes rates for.
+const CURRENCIES = ["USD", "CAD", "EUR", "GBP", "AUD", "NZD", "JPY", "KRW", "CHF", "SEK", "NOK", "DKK", "SGD", "HKD", "MXN", "BRL", "CNY", "INR", "PLN", "CZK", "ZAR"];
+const RATES_KEY = "beanfeed:rates:v1";
+const RATES_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+function loadSavedRates(): Rates | null {
+  try {
+    const saved = JSON.parse(localStorage.getItem(RATES_KEY) ?? "null") as { at: number; rates: Rates } | null;
+    return saved && Date.now() - saved.at < RATES_MAX_AGE_MS ? saved.rates : null;
+  } catch {
+    return null;
+  }
 }
 
 export type RoasterStatus = { state: "loading" } | { state: "ok" } | { state: "error"; message: string };
@@ -53,11 +63,12 @@ export function Feed() {
   const [query, setQuery] = useState("");
   const [roasterFilter, setRoasterFilter] = useState<string | null>(null);
   const [dialog, setDialog] = useState<"add" | "manage" | "link" | null>(null);
-  const [linkPreview, setLinkPreview] = useState<{ incoming: SharedRoaster[]; already: SharedRoaster[] } | null>(null);
+  const [linkPreview, setLinkPreview] = useState<{ incoming: SharedRoaster[]; alreadyNames: string[] } | null>(null);
   const [linkImport, setLinkImport] = useState<LinkImport | null>(null);
   const [lastHidden, setLastHidden] = useState<string | null>(null);
   const [chipsOpen, setChipsOpen] = useState(false);
   const [shareNote, setShareNote] = useState<string | null>(null);
+  const [rates, setRates] = useState<Rates | null>(null);
   const [hiddenChips, setHiddenChips] = useState(0);
   const barRef = useRef<HTMLElement>(null);
   const stateRef = useRef(state);
@@ -105,30 +116,21 @@ export function Feed() {
     return true;
   }, []);
 
-  /** Follow everything in a share link right away; the banner offers Undo. */
-  const importShared = useCallback(async (entries: SharedRoaster[], alreadyFollowing: number) => {
-    const result: LinkImport = { total: entries.length, done: 0, added: [], failed: [], alreadyFollowing, running: true };
-    setLinkImport({ ...result });
-    const queue = [...entries];
-    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, queue.length) }, async () => {
-      for (let e = queue.shift(); e; e = queue.shift()) {
-        try {
-          // Old links carry name and platform; new ones are just addresses, so detect.
-          const feed = await requestFeed(e.platform ? { url: e.url, platform: e.platform } : { url: e.url });
-          if (feed.products.length === 0) throw new Error("no coffees");
-          const id = feed.source.feedUrl;
-          const roaster = { id, name: e.name || feed.siteName || hostName(id), platform: feed.source.platform, feedUrl: id, addedAt: Date.now() };
-          if (adopt(roaster, feed)) result.added.push(id);
-          else result.alreadyFollowing++;
-        } catch {
-          result.failed.push(hostName(e.url));
-        }
-        result.done++;
-        setLinkImport({ ...result });
-      }
-    }));
-    result.running = false;
-    setLinkImport({ ...result });
+  /** Look up a roaster from a share link (old links already know the platform). */
+  const lookupShared = useCallback(
+    (e: SharedRoaster) => requestFeed(e.platform ? { url: e.url, platform: e.platform } : { url: e.url }),
+    [],
+  );
+
+  /** Save the roasters picked in the link preview; the banner offers Undo. */
+  const followPicked = useCallback((picked: PickedRoaster[]) => {
+    const added: string[] = [];
+    for (const { entry, feed } of picked) {
+      const id = feed.source.feedUrl;
+      const roaster = { id, name: entry.name || feed.siteName || hostName(id), platform: feed.source.platform, feedUrl: id, addedAt: Date.now() };
+      if (adopt(roaster, feed)) added.push(id);
+    }
+    setLinkImport({ added });
   }, [adopt]);
 
   const readShareLink = useCallback(() => {
@@ -150,7 +152,8 @@ export function Feed() {
       return;
     }
     // Show the whole list and let the visitor choose before anything is added.
-    setLinkPreview({ incoming, already: shared.filter(isFollowed) });
+    const alreadyNames = shared.flatMap((e) => following.find((r) => sameRoasterUrl(r.feedUrl, e.url))?.name ?? []);
+    setLinkPreview({ incoming, alreadyNames });
     setDialog("link");
   }, []);
 
@@ -266,9 +269,38 @@ export function Feed() {
   }), [state.roasters, state.seen, state.prevVisit, cache]);
 
   const hidden = useMemo(() => new Set(state.hidden), [state.hidden]);
+
+  // Exchange rates are only needed when converting, or when roasters price in
+  // different currencies (so price sorting compares like with like).
+  const feedCurrencies = useMemo(() => new Set(allItems.map((i) => i.currency).filter(Boolean)), [allItems]);
+  const needRates = state.prefs.currency !== null || feedCurrencies.size > 1;
+  useEffect(() => {
+    if (!needRates || rates) return;
+    const saved = loadSavedRates();
+    if (saved) { setRates(saved); return; }
+    fetch("/api/rates")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data: Rates | null) => {
+        if (!data?.rates) return;
+        setRates(data);
+        try { localStorage.setItem(RATES_KEY, JSON.stringify({ at: Date.now(), rates: data })); } catch { /* ignore */ }
+      })
+      .catch(() => {});
+  }, [needRates, rates]);
+
+  const target = state.prefs.currency;
+  const money = useCallback(
+    (amount: number | null, currency: string | null, decimals?: number) => formatMoney(amount, currency, target, rates, decimals),
+    [target, rates],
+  );
+  // Sort in the chosen currency, or USD as a neutral yardstick.
+  const toCommon = useCallback(
+    (amount: number, currency: string | null) => (currency ? convert(amount, currency, target ?? "USD", rates) ?? amount : amount),
+    [target, rates],
+  );
   const visible = useMemo(
-    () => filterAndSort(allItems, state.prefs, { roasterId: roasterFilter, query, hidden }),
-    [allItems, state.prefs, roasterFilter, query, hidden],
+    () => filterAndSort(allItems, state.prefs, { roasterId: roasterFilter, query, hidden, toCommon }),
+    [allItems, state.prefs, roasterFilter, query, hidden, toCommon],
   );
   const countFor = (id: string | null) => filterAndSort(allItems, state.prefs, { roasterId: id, query: "", hidden }).length;
   const colorOf = (id: string) => state.roasters.find((r) => r.id === id)?.color ?? ROASTER_COLORS[0];
@@ -318,23 +350,13 @@ export function Feed() {
 
         {linkImport && (
           <div className="banner" role="status">
-            {linkImport.running ? (
-              <span>Adding roasters from your link… {linkImport.done} of {linkImport.total}</span>
-            ) : (
-              <span>
-                {linkImport.added.length > 0
-                  ? <><strong>Added {linkImport.added.length} roaster{linkImport.added.length === 1 ? "" : "s"}</strong> from your link.</>
-                  : "No new roasters were added."}
-                {linkImport.alreadyFollowing > 0 && ` ${linkImport.alreadyFollowing} you already follow${linkImport.alreadyFollowing === 1 ? "s" : ""}.`}
-                {linkImport.failed.length > 0 && ` Couldn't reach ${linkImport.failed.join(", ")}.`}
-              </span>
-            )}
-            {!linkImport.running && linkImport.added.length > 0 && (
-              <button type="button" className="btn" onClick={undoImport}>Undo</button>
-            )}
-            {!linkImport.running && (
-              <button type="button" className="btn btn-ghost" style={{ marginLeft: linkImport.added.length ? 0 : undefined }} onClick={() => setLinkImport(null)}>OK</button>
-            )}
+            <span>
+              {linkImport.added.length > 0
+                ? <><strong>Added {linkImport.added.length} roaster{linkImport.added.length === 1 ? "" : "s"}</strong> from the link.</>
+                : "No new roasters were added."}
+            </span>
+            {linkImport.added.length > 0 && <button type="button" className="btn" onClick={undoImport}>Undo</button>}
+            <button type="button" className="btn btn-ghost" style={{ marginLeft: linkImport.added.length ? 0 : undefined }} onClick={() => setLinkImport(null)}>OK</button>
           </div>
         )}
 
@@ -378,7 +400,19 @@ export function Feed() {
                 <option value="newest">Newest first</option>
                 <option value="price-asc">Price: low to high</option>
                 <option value="price-desc">Price: high to low</option>
+                <option value="per-cup">Price per cup: low to high</option>
                 <option value="roaster">By roaster</option>
+              </select>
+              <label className="cup-input" title="Grams of coffee per cup, for price per cup">
+                <input type="number" inputMode="decimal" min={5} max={60} step={0.5} value={state.prefs.cupGrams}
+                  onChange={(e) => { const v = parseFloat(e.target.value); if (v >= 5 && v <= 60) setPref("cupGrams", v); }} />
+                <span>g/cup</span>
+              </label>
+              <label className="sr-only" htmlFor="currency">Show prices in</label>
+              <select id="currency" className="select" value={target ?? ""} onChange={(e) => setPref("currency", e.target.value || null)}
+                title={rates?.date ? `Converted with European Central Bank rates from ${rates.date}` : undefined}>
+                <option value="">Store currency</option>
+                {CURRENCIES.map((c) => <option key={c} value={c}>{c}</option>)}
               </select>
               <div className="segmented" role="group" aria-label="Layout">
                 {(["grid", "list"] as ViewMode[]).map((v) => (
@@ -421,7 +455,7 @@ export function Feed() {
             ) : (
               <section className={state.prefs.view} aria-label="Coffees">
                 {visible.map((item) => (
-                  <ProductCard key={item.key} item={item} color={colorOf(item.roasterId)} view={state.prefs.view}
+                  <ProductCard key={item.key} item={item} cupGrams={state.prefs.cupGrams} money={money} color={colorOf(item.roasterId)} view={state.prefs.view}
                     onHide={() => hide(item.key)} onRoaster={() => setRoasterFilter(item.roasterId)} />
                 ))}
               </section>
@@ -434,12 +468,14 @@ export function Feed() {
         {linkPreview && (
           <LinkPreview
             incoming={linkPreview.incoming}
-            already={linkPreview.already}
+            alreadyNames={linkPreview.alreadyNames}
+            firstVisit={state.roasters.length === 0}
+            lookup={lookupShared}
             onCancel={() => { setDialog(null); setLinkPreview(null); }}
-            onFollow={(selected) => {
+            onFollow={(picked) => {
               setDialog(null);
               setLinkPreview(null);
-              importShared(selected, 0);
+              followPicked(picked);
             }}
           />
         )}

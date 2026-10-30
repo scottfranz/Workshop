@@ -1,6 +1,6 @@
 import { keepCoffee, noteSkipped, searchTextFor } from "./filter";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
-import { absoluteUrl, isSampleSize, minPrice, stripHtml, summarize, toIso } from "./text";
+import { absoluteUrl, pickBag, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
 
 interface ShopifyProduct {
@@ -13,7 +13,7 @@ interface ShopifyProduct {
   tags?: string[] | string;
   published_at?: string;
   created_at?: string;
-  variants?: { price?: string; available?: boolean; title?: string }[];
+  variants?: { price?: string; available?: boolean; title?: string; option1?: string | null; option2?: string | null; option3?: string | null }[];
   options?: { name?: string; values?: string[] }[];
   images?: { src?: string }[];
 }
@@ -23,16 +23,6 @@ export function shopifyProductsEndpoint(feedUrl: string): string {
   const u = new URL(feedUrl);
   const collection = u.pathname.match(/\/collections\/[^/]+/);
   return `${u.origin}${collection ? collection[0] : ""}/products.json`;
-}
-
-type Variant = NonNullable<ShopifyProduct["variants"]>[number];
-
-/** Variants that are real bags: in stock if any are, and not tiny sample sizes if bigger ones exist. */
-function bagVariants(variants: Variant[]): Variant[] {
-  const inStock = variants.filter((v) => v.available !== false);
-  const pool = inStock.length ? inStock : variants;
-  const full = pool.filter((v) => !isSampleSize(v.title));
-  return full.length ? full : pool;
 }
 
 /**
@@ -59,12 +49,17 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       noteSkipped(title);
       continue;
     }
+    const bag = pickBag(
+      variants.map((v) => ({ price: v.price, available: v.available, label: [v.title, v.option1, v.option2, v.option3].filter(Boolean).join(" ") })),
+      title,
+    );
     products.push({
       id: String(p.id),
       title,
       url: `${origin}/products/${p.handle}`,
       image: absoluteUrl(p.images?.[0]?.src, origin),
-      price: minPrice(bagVariants(variants).map((v) => v.price)),
+      price: bag.price,
+      size: bag.size,
       currency,
       available: variants.length === 0 ? true : variants.some((v) => v.available !== false),
       publishedAt: toIso(p.published_at ?? p.created_at),
