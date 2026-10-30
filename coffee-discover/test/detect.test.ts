@@ -38,6 +38,7 @@ describe("detectFeed", () => {
     expect(feed.source).toEqual({ platform: "shopify", feedUrl: "https://roaster.example" });
     expect(feed.siteName).toBe("Roaster Co");
     expect(feed.products).toHaveLength(2);
+    expect(feed.skipped).toEqual(["Comandante C40 Grinder", "Digital Gift Card"]);
   });
 
   it("detects Big Cartel's array-shaped products.json", async () => {

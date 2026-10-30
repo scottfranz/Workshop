@@ -35,6 +35,7 @@ export interface SavedState {
 export interface CachedFeed {
   fetchedAt: number;
   products: Product[];
+  skipped?: string[];
 }
 
 const STATE_KEY = "beanfeed:v1";

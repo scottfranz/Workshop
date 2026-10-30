@@ -1,6 +1,6 @@
-import { looksLikeCoffee } from "./filter";
+import { keepCoffee } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
-import { absoluteUrl, minPrice, summarize, toIso } from "./text";
+import { absoluteUrl, minPrice, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
 
 interface ShopifyProduct {
@@ -12,7 +12,8 @@ interface ShopifyProduct {
   tags?: string[] | string;
   published_at?: string;
   created_at?: string;
-  variants?: { price?: string; available?: boolean }[];
+  variants?: { price?: string; available?: boolean; title?: string }[];
+  options?: { name?: string; values?: string[] }[];
   images?: { src?: string }[];
 }
 
@@ -32,8 +33,12 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
     const title = (p.title ?? "").trim();
     if (!title || !p.handle) continue;
     const tags = Array.isArray(p.tags) ? p.tags : (p.tags ?? "").split(",").map((t) => t.trim());
-    if (!looksLikeCoffee(title, p.product_type, tags)) continue;
     const variants = p.variants ?? [];
+    const options = [
+      ...(p.options ?? []).flatMap((o) => [o.name ?? "", ...(o.values ?? [])]),
+      ...variants.map((v) => v.title ?? ""),
+    ].filter((o) => o && o !== "Title" && o !== "Default Title");
+    if (!keepCoffee({ title, productType: p.product_type, tags, description: stripHtml(p.body_html), options })) continue;
     products.push({
       id: String(p.id),
       title,

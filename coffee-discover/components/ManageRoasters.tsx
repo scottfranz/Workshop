@@ -3,13 +3,13 @@
 import { useState } from "react";
 import { timeAgo } from "@/lib/feed";
 import { PLATFORM_LABELS } from "@/lib/scrapers/types";
-import { encodeShare, type SavedRoaster } from "@/lib/storage";
+import { encodeShare, type CachedFeed, type SavedRoaster } from "@/lib/storage";
 import type { RoasterStatus } from "./Feed";
 
-export function ManageRoasters({ roasters, status, fetchedAt, onRename, onRemove, onRefresh }: {
+export function ManageRoasters({ roasters, status, cache, onRename, onRemove, onRefresh }: {
   roasters: SavedRoaster[];
   status: Record<string, RoasterStatus>;
-  fetchedAt: Record<string, number | undefined>;
+  cache: Record<string, CachedFeed | undefined>;
   onRename: (id: string, name: string) => void;
   onRemove: (id: string) => void;
   onRefresh: (id: string) => void;
@@ -36,7 +36,8 @@ export function ManageRoasters({ roasters, status, fetchedAt, onRename, onRemove
       <ul className="roaster-list">
         {roasters.map((r) => {
           const s = status[r.id];
-          const at = fetchedAt[r.id];
+          const at = cache[r.id]?.fetchedAt;
+          const skipped = cache[r.id]?.skipped ?? [];
           return (
             <li key={r.id} className="roaster-row">
               <label className="sr-only" htmlFor={`name-${r.id}`}>Name for {r.feedUrl}</label>
@@ -51,6 +52,12 @@ export function ManageRoasters({ roasters, status, fetchedAt, onRename, onRemove
                 {at && <> · updated {timeAgo(at)}</>}
                 {s?.state === "loading" && <> · checking…</>}
                 {s?.state === "error" && <p className="error">{s.message}</p>}
+                {skipped.length > 0 && (
+                  <details className="skipped">
+                    <summary>{skipped.length} non-coffee item{skipped.length === 1 ? "" : "s"} left out</summary>
+                    <ul>{skipped.map((t) => <li key={t}>{t}</li>)}</ul>
+                  </details>
+                )}
               </div>
             </li>
           );

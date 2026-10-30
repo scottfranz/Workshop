@@ -161,6 +161,9 @@ dialog::backdrop { background: rgba(20, 14, 9, 0.5); }
 .roaster-row .input:hover, .roaster-row .input:focus { border-color: var(--line); background: var(--surface); }
 .roaster-meta { grid-column: 1 / -1; font-size: 13px; color: var(--ink-3); overflow-wrap: anywhere; }
 .roaster-meta .error { font-size: 13px; margin: 2px 0 0; }
+.skipped { margin-top: 6px; }
+.skipped summary { cursor: pointer; width: fit-content; }
+.skipped ul { margin: 6px 0 0; padding-left: 18px; max-height: 180px; overflow-y: auto; }
 .row-actions { display: flex; gap: 4px; }
 
 .site-footer { border-top: 1px solid var(--line); padding: 24px 0 40px; color: var(--ink-3); font-size: 14px; }

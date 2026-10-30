@@ -1,6 +1,6 @@
-import { looksLikeCoffee } from "./filter";
+import { keepCoffee } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
-import { absoluteUrl, decodeEntities, summarize, toNumber } from "./text";
+import { absoluteUrl, decodeEntities, stripHtml, summarize, toNumber } from "./text";
 import type { Product } from "./types";
 
 // Uses WooCommerce's public Store API, which needs no API keys.
@@ -17,6 +17,7 @@ interface WooProduct {
   images?: { src?: string }[];
   categories?: { slug?: string; name?: string }[];
   prices?: { price?: string; currency_code?: string; currency_minor_unit?: number };
+  attributes?: { name?: string; terms?: { name?: string }[] }[];
 }
 
 /** A /product-category/<slug>/ link narrows the feed to that category. */
@@ -35,7 +36,9 @@ export function parseWooCommerce(data: unknown, feedUrl: string): Product[] {
     const cats = p.categories ?? [];
     if (category && !cats.some((c) => c.slug === category)) continue;
     const catText = cats.map((c) => c.name ?? c.slug ?? "").join(" ");
-    if (!looksLikeCoffee(title, catText, [])) continue;
+    const options = (p.attributes ?? []).flatMap((a) => [a.name ?? "", ...(a.terms ?? []).map((t) => t.name ?? "")]);
+    const description = stripHtml(`${p.short_description ?? ""} ${p.description ?? ""}`);
+    if (!keepCoffee({ title, productType: catText, description, options })) continue;
     const minor = p.prices?.currency_minor_unit ?? 2;
     const cents = toNumber(p.prices?.price);
     products.push({

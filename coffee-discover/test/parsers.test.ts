@@ -115,22 +115,46 @@ describe("json-ld", () => {
 });
 
 describe("coffee filter", () => {
+  const coffee = (title: string, extra: Partial<Parameters<typeof looksLikeCoffee>[0] & object> = {}) => looksLikeCoffee({ title, ...extra });
+
   it.each([
-    ["Ethiopia Yirgacheffe", true],
-    ["Toffee Bomb Espresso Blend", true],
-    ["Classic Blend", true],
-    ["Pink Bourbon Colombia", true],
-    ["Hario V60 Dripper", false],
-    ["Logo Tee", false],
-    ["Coffee Subscription", false],
-    ["Ceramic Mug", false],
-  ])("%s → %s", (title, expected) => {
-    expect(looksLikeCoffee(title)).toBe(expected);
+    // the kinds of things that were slipping through
+    ["Aquacode Water Minerals", {}],
+    ["Aquacode", { options: ["12 pack"] }],
+    ["The World Atlas of Coffee", { productType: "Books" }],
+    ["Craft Coffee: A Manual", { productType: "Book" }],
+    ["Normcore Puck Screen 58.5mm", { productType: "" }],
+    ["Third Wave Water Classic Profile", {}],
+    ["Espresso Cup", {}],
+    ["Mystery Item", { options: ["Small", "Large"] }],
+    ["Hario V60 Dripper", {}],
+    ["Logo Tee", {}],
+    ["Coffee Subscription", {}],
+    ["Ceramic Mug", {}],
+    ["Barista Toolkit", { productType: "Tools", description: "Great for espresso" }],
+  ])("drops %s", (title, extra) => {
+    expect(coffee(title, extra)).toBe(false);
   });
 
-  it("trusts an explicit coffee product type", () => {
-    expect(looksLikeCoffee("Server Room Blend", "Coffee")).toBe(true);
-    expect(looksLikeCoffee("Ethiopia", "Merchandise")).toBe(false);
+  it.each([
+    ["Ethiopia Yirgacheffe", {}],
+    ["Toffee Bomb Espresso Blend", {}],
+    ["Pink Bourbon", {}],
+    ["Colombia Cup of Excellence #3", {}],
+    ["Ethiopia Guji - Filter Roast", {}],
+    ["Capucas Honduras", {}],
+    ["Big Trouble", { options: ["Size", "12 oz", "5 lb"] }],
+    ["Hambela", { description: "Tasting notes: peach, jasmine. Grown at 2,100 masl." }],
+    ["SCAJ - El Espejo", { options: ["100g"] }],
+    ["Holiday", { productType: "Coffee" }],
+    ["Whole Bean Sampler", {}],
+  ])("keeps %s", (title, extra) => {
+    expect(coffee(title, extra)).toBe(true);
+  });
+
+  it("trusts an explicit coffee product type but not a gear one", () => {
+    expect(coffee("Server Room", { productType: "Coffee" })).toBe(true);
+    expect(coffee("Ethiopia", { productType: "Merchandise" })).toBe(false);
   });
 });
 

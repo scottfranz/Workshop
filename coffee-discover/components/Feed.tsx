@@ -52,7 +52,7 @@ export function Feed() {
     setStatus((s) => ({ ...s, [r.id]: { state: "loading" } }));
     try {
       const feed = await requestFeed({ url: r.feedUrl, platform: r.platform });
-      setCache((c) => ({ ...c, [r.id]: { fetchedAt: Date.now(), products: feed.products } }));
+      setCache((c) => ({ ...c, [r.id]: { fetchedAt: Date.now(), products: feed.products, skipped: feed.skipped } }));
       setState((s) => ({ ...s, seen: markSeen(s.seen, r.id, feed.products) }));
       setStatus((s) => ({ ...s, [r.id]: { state: "ok" } }));
     } catch (err) {
@@ -108,7 +108,7 @@ export function Feed() {
       id, name: name || feed.siteName || hostName(id), platform: feed.source.platform, feedUrl: id, addedAt: now,
     };
     setState((s) => ({ ...s, roasters: [...s.roasters, roaster], seen: markSeen(s.seen, id, feed.products, now) }));
-    setCache((c) => ({ ...c, [id]: { fetchedAt: now, products: feed.products } }));
+    setCache((c) => ({ ...c, [id]: { fetchedAt: now, products: feed.products, skipped: feed.skipped } }));
     setStatus((s) => ({ ...s, [id]: { state: "ok" } }));
     setDialog(null);
   }
@@ -281,7 +281,7 @@ export function Feed() {
         <ManageRoasters
           roasters={state.roasters}
           status={status}
-          fetchedAt={Object.fromEntries(Object.entries(cache).map(([id, c]) => [id, c.fetchedAt]))}
+          cache={cache}
           onRename={(id, name) => setState((s) => ({ ...s, roasters: s.roasters.map((r) => (r.id === id ? { ...r, name } : r)) }))}
           onRemove={removeRoaster}
           onRefresh={(id) => { const r = state.roasters.find((x) => x.id === id); if (r) refreshOne(r); }}

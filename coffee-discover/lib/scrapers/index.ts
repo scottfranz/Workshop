@@ -1,4 +1,5 @@
 import { fetchBigCartel, isBigCartelList, parseBigCartel } from "./bigcartel";
+import { collectSkipped } from "./filter";
 import { fetchJsonLd } from "./jsonld";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
 import { fetchShopify, parseShopify, shopifyMeta, shopifyProductsEndpoint } from "./shopify";
@@ -32,8 +33,22 @@ function finish(source: FeedSource, siteName: string | null, products: Product[]
   };
 }
 
+async function withSkipped(fn: () => Promise<RoasterFeed>): Promise<RoasterFeed> {
+  const [feed, skipped] = await collectSkipped(fn);
+  return { ...feed, skipped: skipped.map((t) => preferLatin(t)) };
+}
+
 /** Read a roaster whose platform we already know. */
-export async function fetchFeed(source: FeedSource): Promise<RoasterFeed> {
+export function fetchFeed(source: FeedSource): Promise<RoasterFeed> {
+  return withSkipped(() => fetchFeedInner(source));
+}
+
+/** Work out how to read a store from whatever link someone pasted. */
+export function detectFeed(rawUrl: string): Promise<RoasterFeed> {
+  return withSkipped(() => detectFeedInner(rawUrl));
+}
+
+async function fetchFeedInner(source: FeedSource): Promise<RoasterFeed> {
   const loaders: Record<Platform, (url: string) => Promise<{ products: Product[]; siteName: string | null }>> = {
     shopify: fetchShopify,
     woocommerce: fetchWooCommerce,
@@ -78,11 +93,8 @@ async function detectSquarespace(url: string, html: string): Promise<RoasterFeed
   return null;
 }
 
-/**
- * Work out how to read a store from whatever link someone pasted: homepage,
- * shop page, or collection. Cheapest, most reliable checks go first.
- */
-export async function detectFeed(rawUrl: string): Promise<RoasterFeed> {
+// Homepage, shop page or collection link: cheapest, most reliable checks go first.
+async function detectFeedInner(rawUrl: string): Promise<RoasterFeed> {
   const url = normalizeUrl(rawUrl);
   const origin = new URL(url).origin;
 

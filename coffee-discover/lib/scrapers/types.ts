@@ -36,4 +36,6 @@ export interface RoasterFeed {
   /** Display name guessed from the site, if we could find one. */
   siteName: string | null;
   products: Product[];
+  /** Titles left out because they didn't look like coffee. */
+  skipped?: string[];
 }

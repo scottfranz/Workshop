@@ -3,9 +3,9 @@
 // read that from the page, and if the page only lists products, we visit a
 // handful of product pages to read theirs.
 
-import { looksLikeCoffee } from "./filter";
+import { keepCoffee } from "./filter";
 import { FetchError, safeFetchText } from "./safeFetch";
-import { absoluteUrl, decodeEntities, minPrice, summarize, toIso } from "./text";
+import { absoluteUrl, decodeEntities, minPrice, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
 
 const MAX_PRODUCT_PAGES = 24;
@@ -60,7 +60,9 @@ function offersOf(node: Node): Node[] {
   return list.flatMap((o) => (Array.isArray(o.offers) ? [o, ...(o.offers as Node[]).map((c) => ({ priceCurrency: o.priceCurrency, ...c }))] : [o]));
 }
 
-export function productFromNode(node: Node, pageUrl: string): (Product & { category: string }) | null {
+type Candidate = Product & { category: string; signals: string[]; fullDescription: string };
+
+export function productFromNode(node: Node, pageUrl: string): Candidate | null {
   if (!hasType(node, "Product") && !hasType(node, "ProductGroup")) return null;
   const title = decodeEntities(String(node.name ?? "")).trim();
   if (!title) return null;
@@ -78,7 +80,22 @@ export function productFromNode(node: Node, pageUrl: string): (Product & { categ
     publishedAt: toIso(node.releaseDate ?? node.datePublished),
     description: summarize(String(node.description ?? "")),
     category: String(node.category ?? ""),
+    fullDescription: String(node.description ?? ""),
+    // Variant names and weights, e.g. "12oz / Whole Bean".
+    signals: [
+      ...(Array.isArray(node.hasVariant) ? (node.hasVariant as Node[]).map((v) => String(v?.name ?? "")) : []),
+      ...offers.map((o) => String(o.name ?? "")),
+      typeof node.weight === "object" && node.weight ? `${(node.weight as Node).value ?? ""}${(node.weight as Node).unitCode ?? ""}` : "",
+    ].filter(Boolean),
   };
+}
+
+function isCoffee(c: Candidate): boolean {
+  return keepCoffee({ title: c.title, productType: c.category, description: stripHtml(c.fullDescription), options: c.signals });
+}
+
+function toProduct({ category: _c, signals: _s, fullDescription: _d, ...product }: Candidate): Product {
+  return product;
 }
 
 export function productsFromHtml(html: string, pageUrl: string): { products: Product[]; listUrls: string[] } {
@@ -88,8 +105,7 @@ export function productsFromHtml(html: string, pageUrl: string): { products: Pro
   for (const node of nodes) {
     const p = productFromNode(node, pageUrl);
     if (p) {
-      const { category, ...product } = p;
-      if (looksLikeCoffee(product.title, category)) products.push(product);
+      if (isCoffee(p)) products.push(toProduct(p));
       continue;
     }
     if (hasType(node, "ItemList") && Array.isArray(node.itemListElement)) {
@@ -97,10 +113,7 @@ export function productsFromHtml(html: string, pageUrl: string): { products: Pro
         const item = (el.item ?? el) as Node | string;
         if (typeof item === "object" && hasType(item, "Product")) {
           const ip = productFromNode(item, pageUrl);
-          if (ip && looksLikeCoffee(ip.title, ip.category)) {
-            const { category: _c, ...product } = ip;
-            products.push(product);
-          }
+          if (ip && isCoffee(ip)) products.push(toProduct(ip));
           continue;
         }
         const href = typeof item === "string" ? item : (item.url as string) ?? (el.url as string);
