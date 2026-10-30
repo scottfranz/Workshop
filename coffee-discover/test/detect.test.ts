@@ -19,7 +19,8 @@ function mockSite(routes: Routes) {
   vi.stubGlobal("fetch", vi.fn(async (input: URL | string) => {
     const url = String(input);
     calls.push(url);
-    const r = routes[url];
+    // Shopify feeds pin &currency=XXX once meta.json is known; match with or without it.
+    const r = routes[url] ?? routes[url.replace(/&currency=[A-Z]{3}/, "")];
     if (!r) return new Response("Not found", { status: 404, headers: { "content-type": "text/html" } });
     const body = typeof r.body === "string" ? r.body : JSON.stringify(r.body);
     const headers: Record<string, string> = { "content-type": r.type ?? (typeof r.body === "string" ? "text/html" : "application/json") };
