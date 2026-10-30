@@ -20,6 +20,8 @@ export async function GET(req: Request) {
   const params = new URL(req.url).searchParams;
   const rawUrl = params.get("url");
   const platform = params.get("platform") as Platform | null;
+  const currencyParam = params.get("currency");
+  const currency = currencyParam && /^[A-Z]{3}$/.test(currencyParam) ? currencyParam : undefined;
   if (!rawUrl) return NextResponse.json({ error: "Add a link to a roaster's website." }, { status: 400 });
   if (platform && !PLATFORMS.includes(platform)) return NextResponse.json({ error: "Unknown platform." }, { status: 400 });
 
@@ -30,12 +32,12 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: "That doesn't look like a valid web address." }, { status: 400 });
   }
 
-  const key = `${platform ?? "detect"}|${url}`;
+  const key = `${platform ?? "detect"}|${currency ?? ""}|${url}`;
   const hit = memo.get(key);
   if (hit && Date.now() - hit.at < MEMO_MS) return NextResponse.json(hit.feed, { headers: { "Cache-Control": CACHE_HEADER } });
 
   try {
-    const feed = platform ? await fetchFeed({ platform, feedUrl: url }) : await detectFeed(url);
+    const feed = platform ? await fetchFeed({ platform, feedUrl: url }, { currency }) : await detectFeed(url, { currency });
     memo.set(key, { at: Date.now(), feed });
     if (memo.size > 500) memo.delete(memo.keys().next().value!);
     return NextResponse.json(feed, { headers: { "Cache-Control": CACHE_HEADER } });

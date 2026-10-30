@@ -8,7 +8,7 @@ import { encodeShare, type CachedFeed, type SavedRoaster } from "@/lib/storage";
 import type { RoasterStatus } from "./Feed";
 
 export function ManageRoasters({
-  roasters, status, cache, cupGrams, currency, ratesDate, onCupGrams, onCurrency, onRename, onRecolor, onRemove, onRemoveAll, onRefresh,
+  roasters, status, cache, cupGrams, currency, ratesDate, onCupGrams, onCurrency, onRename, onRecolor, onUsualBag, onRemove, onRemoveAll, onRefresh,
 }: {
   cupGrams: number;
   currency: string | null;
@@ -20,6 +20,7 @@ export function ManageRoasters({
   cache: Record<string, CachedFeed | undefined>;
   onRename: (id: string, name: string) => void;
   onRecolor: (id: string, color: string) => void;
+  onUsualBag: (id: string, grams: number | undefined) => void;
   onRemove: (id: string) => void;
   onRemoveAll: () => void;
   onRefresh: (id: string) => void;
@@ -48,6 +49,7 @@ export function ManageRoasters({
           const s = status[r.id];
           const at = cache[r.id]?.fetchedAt;
           const skipped = cache[r.id]?.skipped ?? [];
+          const unsized = (cache[r.id]?.products ?? []).filter((p) => p.available && !p.size).length;
           return (
             <li key={r.id} className="roaster-row">
               <div className="name-cell">
@@ -68,6 +70,17 @@ export function ManageRoasters({
                 {at && <> · updated {timeAgo(at)}</>}
                 {s?.state === "loading" && <> · checking…</>}
                 {s?.state === "error" && <p className="error">{s.message}</p>}
+                {(unsized > 0 || r.usualBagGrams) && (
+                  <label className="usual-bag">
+                    {r.usualBagGrams ? "Bags assumed to be" : `${unsized} coffee${unsized === 1 ? " has" : "s have"} no bag size listed. Usual bag:`}
+                    <span className="cup-input">
+                      <input type="number" inputMode="numeric" min={50} max={5000} step={10} placeholder="250" defaultValue={r.usualBagGrams ?? ""}
+                        aria-label={`Usual bag size for ${r.name}, in grams`}
+                        onChange={(e) => { const v = parseInt(e.target.value, 10); onUsualBag(r.id, v >= 50 && v <= 5000 ? v : undefined); }} />
+                      <span>g</span>
+                    </span>
+                  </label>
+                )}
                 {skipped.length > 0 && (
                   <details className="skipped">
                     <summary>{skipped.length} non-coffee item{skipped.length === 1 ? "" : "s"} left out</summary>

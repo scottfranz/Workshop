@@ -46,6 +46,33 @@ describe("detectFeed", () => {
     expect(feed.skipped).toEqual(["Comandante C40 Grinder", "Digital Gift Card"]);
   });
 
+  it("labels prices with the currency the store actually uses for us", async () => {
+    // A Canadian store that only offers USD to US visitors: meta says CAD, the cart says USD.
+    const calls = mockSite({
+      "https://luna.example/products.json?limit=250": { body: fx.shopifyProducts },
+      "https://luna.example/products.json?limit=250&page=1&currency=USD": { body: fx.shopifyProducts },
+      "https://luna.example/products.json?limit=250&page=2&currency=USD": { body: { products: [] } },
+      "https://luna.example/meta.json": { body: { name: "Luna", currency: "CAD" } },
+      "https://luna.example/cart.js?currency=CAD": { body: { currency: "USD", items: [] } },
+    });
+    const feed = await detectFeed("luna.example");
+    expect(feed.products[0].currency).toBe("USD");
+    expect(calls).toContain("https://luna.example/products.json?limit=250&page=1&currency=USD");
+  });
+
+  it("asks for the visitor's currency so the store quotes its own price in it", async () => {
+    const calls = mockSite({
+      "https://luna.example/products.json?limit=250": { body: fx.shopifyProducts },
+      "https://luna.example/products.json?limit=250&page=1&currency=USD": { body: fx.shopifyProducts },
+      "https://luna.example/products.json?limit=250&page=2&currency=USD": { body: { products: [] } },
+      "https://luna.example/meta.json": { body: { name: "Luna", currency: "CAD" } },
+      "https://luna.example/cart.js?currency=USD": { body: { currency: "USD", items: [] } },
+    });
+    const feed = await detectFeed("luna.example", { currency: "USD" });
+    expect(feed.products[0].currency).toBe("USD");
+    expect(calls).toContain("https://luna.example/cart.js?currency=USD");
+  });
+
   it("keeps paging past a short Shopify page", async () => {
     const [guji, , , decaf] = fx.shopifyProducts.products;
     mockSite({

@@ -50,6 +50,8 @@ export function buildItems(
     const isNew = recentlyPublished || (arrivedAfterFollow && now - firstSeen < NEW_WINDOW_MS);
     return {
       ...p,
+      // Fill in the visitor's "usual bag size" for this roaster when the store doesn't say.
+      size: p.size ?? (roaster.usualBagGrams ? { grams: roaster.usualBagGrams, label: `${roaster.usualBagGrams} g` } : null),
       roasterId: roaster.id,
       roasterName: roaster.name,
       key: `${roaster.id}::${p.id}`,

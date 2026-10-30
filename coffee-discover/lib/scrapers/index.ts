@@ -70,12 +70,18 @@ async function withSkipped(fn: () => Promise<RoasterFeed>): Promise<RoasterFeed>
  * to Shopify, new domain), so if the saved setup stops working, detect afresh;
  * the response's source tells the client to update what it saved.
  */
-export function fetchFeed(source: FeedSource): Promise<RoasterFeed> {
+/** Options that change what stores send back. */
+export interface FeedOptions {
+  /** Ask stores that support it (Shopify) to price in this currency. */
+  currency?: string;
+}
+
+export function fetchFeed(source: FeedSource, opts: FeedOptions = {}): Promise<RoasterFeed> {
   return withSkipped(async () => {
     try {
-      return await fetchFeedInner(source);
+      return await fetchFeedInner(source, opts);
     } catch (err) {
-      const fresh = await detectFeedInner(source.feedUrl).catch(() => null);
+      const fresh = await detectFeedInner(source.feedUrl, false, opts).catch(() => null);
       if (fresh && fresh.products.length > 0) return fresh;
       throw err;
     }
@@ -83,13 +89,13 @@ export function fetchFeed(source: FeedSource): Promise<RoasterFeed> {
 }
 
 /** Work out how to read a store from whatever link someone pasted. */
-export function detectFeed(rawUrl: string): Promise<RoasterFeed> {
-  return withSkipped(() => detectFeedInner(rawUrl));
+export function detectFeed(rawUrl: string, opts: FeedOptions = {}): Promise<RoasterFeed> {
+  return withSkipped(() => detectFeedInner(rawUrl, false, opts));
 }
 
-async function fetchFeedInner(source: FeedSource): Promise<RoasterFeed> {
+async function fetchFeedInner(source: FeedSource, opts: FeedOptions): Promise<RoasterFeed> {
   const loaders: Record<Platform, (url: string) => Promise<{ products: Product[]; siteName: string | null }>> = {
-    shopify: fetchShopify,
+    shopify: (url) => fetchShopify(url, opts.currency),
     woocommerce: fetchWooCommerce,
     squarespace: fetchSquarespace,
     square: (url) => fetchSquare(url),
@@ -134,7 +140,7 @@ async function detectSquarespace(url: string, html: string): Promise<RoasterFeed
 }
 
 // Homepage, shop page or collection link: cheapest, most reliable checks go first.
-async function detectFeedInner(rawUrl: string, followedMove = false): Promise<RoasterFeed> {
+async function detectFeedInner(rawUrl: string, followedMove = false, opts: FeedOptions = {}): Promise<RoasterFeed> {
   const url = normalizeUrl(rawUrl);
   const origin = new URL(url).origin;
 
@@ -142,7 +148,7 @@ async function detectFeedInner(rawUrl: string, followedMove = false): Promise<Ro
   const pj = await safeFetchJson(`${shopifyProductsEndpoint(url)}?limit=250`).catch(() => null);
   if (pj && Array.isArray((pj.data as { products?: unknown })?.products)) {
     // The full fetch also reads the sitemap, which hides wholesale/private products.
-    const full = await fetchShopify(url);
+    const full = await fetchShopify(url, opts.currency);
     return finish({ platform: "shopify", feedUrl: url }, full.siteName, full.products);
   }
   if (pj && isBigCartelList(pj.data)) {
@@ -167,13 +173,13 @@ async function detectFeedInner(rawUrl: string, followedMove = false): Promise<Ro
   // The roaster moved to a new domain (e.g. subtextcoffee.com → subtext.coffee): start over there.
   const landedOn = new URL(page.url);
   if (!followedMove && landedOn.hostname.replace(/^www\./, "") !== new URL(url).hostname.replace(/^www\./, "")) {
-    return detectFeedInner(landedOn.origin + new URL(url).pathname, true);
+    return detectFeedInner(landedOn.origin + new URL(url).pathname, true, opts);
   }
 
   // The page is Shopify but /products.json didn't answer the first time. That's
   // usually a momentary block or rate limit, so try once more before falling back.
   if (isShopifyHtml(html)) {
-    const retry = await fetchShopify(url).catch(() => null);
+    const retry = await fetchShopify(url, opts.currency).catch(() => null);
     if (retry && retry.products.length > 0) return finish({ platform: "shopify", feedUrl: url }, retry.siteName, retry.products);
   }
 

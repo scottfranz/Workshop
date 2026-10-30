@@ -37,8 +37,12 @@ export type RoasterStatus = { state: "loading" } | { state: "ok" } | { state: "e
 const STALE_MS = 20 * 60 * 1000;
 const CONCURRENCY = 4;
 
+// The visitor's display currency, sent so stores can quote their own price in it.
+let preferredCurrency: string | null = null;
+
 async function requestFeed(params: Record<string, string>): Promise<RoasterFeed> {
-  const res = await fetch(`/api/roaster?${new URLSearchParams(params)}`);
+  const query = new URLSearchParams(preferredCurrency ? { ...params, currency: preferredCurrency } : params);
+  const res = await fetch(`/api/roaster?${query}`);
   const data = await res.json().catch(() => ({ error: "The server sent an unexpected response." }));
   if (!res.ok) throw new Error(data.error ?? `Request failed (${res.status})`);
   return data as RoasterFeed;
@@ -72,6 +76,7 @@ export function Feed() {
   const stateRef = useRef(state);
   stateRef.current = state;
   const adoptingRef = useRef<string[]>([]);
+  const lastCurrency = useRef<string | null>(null);
   // Once additions are rendered into state, stateRef covers them.
   useEffect(() => { adoptingRef.current = []; }, [state.roasters]);
 
@@ -167,6 +172,9 @@ export function Feed() {
     const cached = loadCache();
     setState(loaded);
     stateRef.current = loaded; // readShareLink below compares against what's saved
+    // Apply the saved currency before the first fetches, not after.
+    preferredCurrency = loaded.prefs.currency;
+    lastCurrency.current = loaded.prefs.currency;
     setCache(cached);
     setStorageOk(saveState(loaded));
     setReady(true);
@@ -288,6 +296,13 @@ export function Feed() {
   }, [needRates, rates, state.prefs.currency]);
 
   const target = state.prefs.currency;
+  preferredCurrency = target;
+  // Changing currency re-asks every store, so those that sell in it give their own price.
+  useEffect(() => {
+    if (!ready || lastCurrency.current === target) return;
+    lastCurrency.current = target;
+    refreshMany(stateRef.current.roasters);
+  }, [target, ready, refreshMany]);
   const money = useCallback(
     (amount: number | null, currency: string | null, decimals?: number) => formatMoney(amount, currency, target, rates, decimals),
     [target, rates],
@@ -483,6 +498,7 @@ export function Feed() {
           roasters={state.roasters}
           status={status}
           cache={cache}
+          onUsualBag={(id, grams) => setState((s) => ({ ...s, roasters: s.roasters.map((r) => (r.id === id ? { ...r, usualBagGrams: grams } : r)) }))}
           onRecolor={(id, color) => setState((s) => ({ ...s, roasters: s.roasters.map((r) => (r.id === id ? { ...r, color } : r)) }))}
           onRename={(id, name) => setState((s) => ({ ...s, roasters: s.roasters.map((r) => (r.id === id ? { ...r, name } : r)) }))}
           onRemove={removeRoaster}
