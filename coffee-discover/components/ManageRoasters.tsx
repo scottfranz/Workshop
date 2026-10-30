@@ -117,7 +117,10 @@ export function ManageRoasters({
         </label>
         <p className="hint" style={{ margin: 0 }}>
           Price per cup uses the bag size each store lists.
-          {currency && <> Converted prices use European Central Bank rates{ratesDate ? ` from ${ratesDate}` : ""} and are marked ≈.</>}
+          {currency && (
+            <> Prices the store doesn&apos;t quote in {currency} are converted with daily rates{ratesDate ? ` from ${ratesDate}` : ""} and marked ≈.
+              {" "}Rates by the European Central Bank and <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer">Exchange Rate API</a>.</>
+          )}
         </p>
       </div>
 

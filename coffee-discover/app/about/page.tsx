@@ -34,6 +34,11 @@ export default function About() {
         <p>
           Coffee photos load directly from each roaster&apos;s image host, with no referrer sent.
         </p>
+        <p>
+          If you choose a currency, stores that sell in it quote their own price. Other prices are converted with daily
+          exchange rates our server fetches from the European Central Bank and{" "}
+          <a href="https://www.exchangerate-api.com" target="_blank" rel="noopener noreferrer">Exchange Rate API</a>, so your browser never contacts them.
+        </p>
 
         <h2>Which shops work</h2>
         <ul>
