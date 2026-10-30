@@ -115,22 +115,46 @@ describe("json-ld", () => {
 });
 
 describe("coffee filter", () => {
+  const coffee = (title: string, extra: Partial<Parameters<typeof looksLikeCoffee>[0] & object> = {}) => looksLikeCoffee({ title, ...extra });
+
   it.each([
-    ["Ethiopia Yirgacheffe", true],
-    ["Toffee Bomb Espresso Blend", true],
-    ["Classic Blend", true],
-    ["Pink Bourbon Colombia", true],
-    ["Hario V60 Dripper", false],
-    ["Logo Tee", false],
-    ["Coffee Subscription", false],
-    ["Ceramic Mug", false],
-  ])("%s → %s", (title, expected) => {
-    expect(looksLikeCoffee(title)).toBe(expected);
+    // the kinds of things that were slipping through
+    ["Aquacode Water Minerals", {}],
+    ["Aquacode", { options: ["12 pack"] }],
+    ["The World Atlas of Coffee", { productType: "Books" }],
+    ["Craft Coffee: A Manual", { productType: "Book" }],
+    ["Normcore Puck Screen 58.5mm", { productType: "" }],
+    ["Third Wave Water Classic Profile", {}],
+    ["Espresso Cup", {}],
+    ["Mystery Item", { options: ["Small", "Large"] }],
+    ["Hario V60 Dripper", {}],
+    ["Logo Tee", {}],
+    ["Coffee Subscription", {}],
+    ["Ceramic Mug", {}],
+    ["Barista Toolkit", { productType: "Tools", description: "Great for espresso" }],
+  ])("drops %s", (title, extra) => {
+    expect(coffee(title, extra)).toBe(false);
   });
 
-  it("trusts an explicit coffee product type", () => {
-    expect(looksLikeCoffee("Server Room Blend", "Coffee")).toBe(true);
-    expect(looksLikeCoffee("Ethiopia", "Merchandise")).toBe(false);
+  it.each([
+    ["Ethiopia Yirgacheffe", {}],
+    ["Toffee Bomb Espresso Blend", {}],
+    ["Pink Bourbon", {}],
+    ["Colombia Cup of Excellence #3", {}],
+    ["Ethiopia Guji - Filter Roast", {}],
+    ["Capucas Honduras", {}],
+    ["Big Trouble", { options: ["Size", "12 oz", "5 lb"] }],
+    ["Hambela", { description: "Tasting notes: peach, jasmine. Grown at 2,100 masl." }],
+    ["SCAJ - El Espejo", { options: ["100g"] }],
+    ["Holiday", { productType: "Coffee" }],
+    ["Whole Bean Sampler", {}],
+  ])("keeps %s", (title, extra) => {
+    expect(coffee(title, extra)).toBe(true);
+  });
+
+  it("trusts an explicit coffee product type but not a gear one", () => {
+    expect(coffee("Server Room", { productType: "Coffee" })).toBe(true);
+    expect(coffee("Ethiopia", { productType: "Merchandise" })).toBe(false);
   });
 });
 
@@ -140,5 +164,45 @@ describe("json-ld aggregate availability", () => {
       "offers":[{"@type":"Offer","price":"20","availability":"OutOfStock"},{"@type":"Offer","price":"35","availability":"https://schema.org/SoldOut"}]}}</script>`;
     const { products } = productsFromHtml(html, "https://r.example/p/kenya");
     expect(products[0]).toMatchObject({ available: false, currency: "USD", price: 20 });
+  });
+});
+
+describe("bilingual text", () => {
+  it.each([
+    ["SCAJ - El Espejo. フィンカ・エル・エスペホ", "SCAJ - El Espejo"],
+    ["SCAJ - Fabio Caballero COE Washed Gesha ラ•サルバヘ. ウォッシュド. ゲシャ", "SCAJ - Fabio Caballero COE Washed Gesha"],
+    ["SCAJ - Red Honey Sidra. ヴィンカ　レッドハニー　シドラ", "SCAJ - Red Honey Sidra"],
+    ["mulled wine, pineapple juice, nectarine テイスティングノート: マルドワイン、パイナップル", "mulled wine, pineapple juice, nectarine"],
+    ["エチオピア グジ", "エチオピア グジ"],
+    ["Ethiopia Guji", "Ethiopia Guji"],
+  ])("%s", async (input, expected) => {
+    const { preferLatin } = await import("@/lib/scrapers/text");
+    expect(preferLatin(input)).toBe(expected);
+  });
+});
+
+describe("bilingual duplicates", () => {
+  const p = (id: string, title: string, image: string | null = null) => ({
+    id, title, url: `https://r.example/${id}`, image, price: 20, currency: "USD", available: true, publishedAt: null, description: null,
+  });
+
+  it("keeps the English listing and drops its bilingual twin", async () => {
+    const { dropBilingualDuplicates } = await import("@/lib/scrapers");
+    const out = dropBilingualDuplicates([
+      p("1", "SCAJ - El Espejo"),
+      p("2", "SCAJ - El Espejo. フィンカ・エル・エスペホ"),
+      p("3", "Fabio Caballero La Salvaje Washed Gesha"),
+      p("4", "SCAJ - Fabio Caballero COE Washed Gesha ラ•サルバヘ. ウォッシュド. ゲシャ", "https://cdn.shopify.com/a.jpg?v=2"),
+      p("5", "Red Honey Sidra", "https://cdn.shopify.com/a.jpg?v=1"),
+      p("6", "SCAJ - Vinka Washed Sidra ヴィンカ. ウォッシュド. シドラ"),
+    ]);
+    // 2 matches by name, 4 matches 5 by photo; 6 has no English twin so it stays.
+    expect(out.map((x) => x.id)).toEqual(["1", "3", "5", "6"]);
+  });
+
+  it("leaves Japanese-only roasters alone", async () => {
+    const { dropBilingualDuplicates } = await import("@/lib/scrapers");
+    const list = [p("1", "エチオピア グジ"), p("2", "ケニア")];
+    expect(dropBilingualDuplicates(list)).toBe(list);
   });
 });

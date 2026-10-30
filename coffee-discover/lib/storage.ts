@@ -9,13 +9,17 @@ export interface SavedRoaster {
   platform: Platform;
   feedUrl: string;
   addedAt: number;
+  /** Hex color used to tag this roaster's coffees. */
+  color?: string;
 }
 
 export type SortMode = "newest" | "price-asc" | "price-desc" | "roaster";
 
+export type ViewMode = "grid" | "list";
+
 export interface Prefs {
+  view: ViewMode;
   hideSoldOut: boolean;
-  newOnly: boolean;
   sort: SortMode;
 }
 
@@ -35,13 +39,14 @@ export interface SavedState {
 export interface CachedFeed {
   fetchedAt: number;
   products: Product[];
+  skipped?: string[];
 }
 
 const STATE_KEY = "beanfeed:v1";
 const CACHE_KEY = "beanfeed:cache:v1";
 const SEEN_TTL_MS = 120 * 24 * 60 * 60 * 1000;
 
-export const DEFAULT_PREFS: Prefs = { hideSoldOut: true, newOnly: false, sort: "newest" };
+export const DEFAULT_PREFS: Prefs = { view: "grid", hideSoldOut: true, sort: "newest" };
 
 export function emptyState(): SavedState {
   return { version: 1, roasters: [], seen: {}, hidden: [], lastVisit: null, prevVisit: null, prefs: { ...DEFAULT_PREFS } };
@@ -65,13 +70,37 @@ function write(key: string, value: unknown): boolean {
   }
 }
 
+// The palette from the original Workshop app.
+export const ROASTER_COLORS = [
+  "#c0622a", "#7a9e7e", "#5b8fa8", "#a0627a", "#8a7ab8", "#b8874a", "#5b9e8a", "#c05a5a",
+  "#6a8fb8", "#9e7a3a", "#b85a8a", "#6aab6a", "#c09a2a", "#7a6ab8", "#5baaa0",
+];
+
+/** The least-used palette color, so roasters stay distinguishable. */
+export function pickColor(taken: (string | undefined)[]): string {
+  const counts = new Map(ROASTER_COLORS.map((c) => [c, 0]));
+  for (const c of taken) if (c && counts.has(c)) counts.set(c, counts.get(c)! + 1);
+  return ROASTER_COLORS.reduce((best, c) => (counts.get(c)! < counts.get(best)! ? c : best));
+}
+
+/** Give any roaster saved before colors existed (or imported by link) a color. */
+export function withColors<T extends { color?: string }>(roasters: T[]): T[] {
+  const taken = roasters.map((r) => r.color);
+  return roasters.map((r, i) => {
+    if (r.color) return r;
+    const color = pickColor(taken);
+    taken[i] = color;
+    return { ...r, color };
+  });
+}
+
 export function loadState(): SavedState {
   const saved = read<Partial<SavedState>>(STATE_KEY);
   if (!saved || saved.version !== 1) return emptyState();
   return {
     ...emptyState(),
     ...saved,
-    roasters: Array.isArray(saved.roasters) ? saved.roasters : [],
+    roasters: Array.isArray(saved.roasters) ? withColors(saved.roasters) : [],
     prefs: { ...DEFAULT_PREFS, ...saved.prefs },
   } as SavedState;
 }

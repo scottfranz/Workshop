@@ -42,7 +42,7 @@ describe("filterAndSort", () => {
   ], { cheap: NOW - DAY, sold: NOW, pricey: roaster.addedAt }, null, NOW);
   const opts = { roasterId: null, query: "", hidden: new Set<string>() };
 
-  it("hides sold out by default and puts new first", () => {
+  it("hides sold out by default and sorts newest first", () => {
     expect(filterAndSort(items, DEFAULT_PREFS, opts).map((i) => i.id)).toEqual(["cheap", "pricey"]);
   });
   it("sorts by price and respects hidden keys", () => {
@@ -72,6 +72,17 @@ describe("storage helpers", () => {
   });
   it("requests smaller CDN images", () => {
     expect(sizedImage("https://cdn.shopify.com/s/files/a.jpg?v=1")).toBe("https://cdn.shopify.com/s/files/a.jpg?v=1&width=600");
+  });
+});
+
+describe("roaster colors", () => {
+  it("hands out unused colors first, then the least-used", async () => {
+    const { pickColor, withColors, ROASTER_COLORS } = await import("@/lib/storage");
+    expect(pickColor([])).toBe(ROASTER_COLORS[0]);
+    expect(pickColor([ROASTER_COLORS[0]])).toBe(ROASTER_COLORS[1]);
+    const colored = withColors<{ color?: string }>([{ color: ROASTER_COLORS[1] }, {}, {}]);
+    expect(colored.map((r) => r.color)).toEqual([ROASTER_COLORS[1], ROASTER_COLORS[0], ROASTER_COLORS[2]]);
+    expect(new Set(withColors(Array.from({ length: 15 }, (): { color?: string } => ({}))).map((r) => r.color)).size).toBe(15);
   });
 });
 

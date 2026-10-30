@@ -67,3 +67,19 @@ export function toIso(v: unknown): string | null {
   const d = typeof v === "number" ? new Date(v) : new Date(String(v));
   return Number.isNaN(d.getTime()) ? null : d.toISOString();
 }
+
+export const CJK = /[\u3040-\u30ff\u3400-\u4dbf\u4e00-\u9fff\uac00-\ud7af\uff66-\uff9f]/;
+
+/**
+ * Some roasters write bilingual titles, e.g. "SCAJ - El Espejo. フィンカ・エル・エスペホ".
+ * When there's enough Latin-script text to stand on its own, drop the CJK words.
+ * Text that is only in Japanese/Chinese/Korean is left alone.
+ */
+export function preferLatin(text: string): string;
+export function preferLatin(text: string | null): string | null;
+export function preferLatin(text: string | null): string | null {
+  if (!text || !CJK.test(text)) return text;
+  const kept = text.split(/\s+/).filter((word) => !CJK.test(word)).join(" ");
+  const cleaned = kept.replace(/[\s.,:;\-\u2013\u2014|/]+$/, "").replace(/^[\s.,:;\-|/]+/, "").trim();
+  return (cleaned.match(/[A-Za-z\u00c0-\u024f]/g)?.length ?? 0) >= 4 ? cleaned : text;
+}

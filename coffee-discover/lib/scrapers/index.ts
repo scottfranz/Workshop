@@ -1,10 +1,12 @@
 import { fetchBigCartel, isBigCartelList, parseBigCartel } from "./bigcartel";
+import { collectSkipped } from "./filter";
 import { fetchJsonLd } from "./jsonld";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
 import { fetchShopify, parseShopify, shopifyMeta, shopifyProductsEndpoint } from "./shopify";
 import {
   SQUARESPACE_SHOP_GUESSES, fetchSquarespace, isSquarespaceProductPage, parseSquarespace, siteTitle, withFormatJson,
 } from "./squarespace";
+import { CJK, preferLatin } from "./text";
 import type { FeedSource, Platform, Product, RoasterFeed } from "./types";
 import { fetchWooCommerce, parseWooCommerce, wooEndpoint } from "./woocommerce";
 
@@ -23,12 +25,53 @@ export function normalizeUrl(raw: string): string {
   return u.toString().replace(/\/$/, "");
 }
 
+const comparable = (title: string) => preferLatin(title).toLowerCase().replace(/\bscaj\b/g, "").replace(/[^a-z0-9]+/g, "");
+const imageKey = (src: string | null) => (src ? src.replace(/^https?:/, "").split("?")[0] : null);
+
+/**
+ * Some roasters list the same coffee twice: once in English and once with a
+ * bilingual (e.g. English + Japanese) title for another market. Drop the
+ * bilingual copy when an English-only listing has the same name or photo.
+ */
+export function dropBilingualDuplicates(products: Product[]): Product[] {
+  const latin = products.filter((p) => !CJK.test(p.title));
+  if (latin.length === 0 || latin.length === products.length) return products;
+  const names = latin.map((p) => comparable(p.title)).filter((n) => n.length >= 4);
+  const images = new Set(latin.map((p) => imageKey(p.image)).filter(Boolean));
+  return products.filter((p) => {
+    if (!CJK.test(p.title)) return true;
+    const name = comparable(p.title);
+    if (images.has(imageKey(p.image))) return false;
+    return !names.some((n) => n === name || (name.length >= 6 && (n.includes(name) || name.includes(n))));
+  });
+}
+
 function finish(source: FeedSource, siteName: string | null, products: Product[]): RoasterFeed {
-  return { source, siteName, products: products.slice(0, MAX_PRODUCTS) };
+  return {
+    source,
+    siteName,
+    products: dropBilingualDuplicates(products)
+      .slice(0, MAX_PRODUCTS)
+      .map((p) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
+  };
+}
+
+async function withSkipped(fn: () => Promise<RoasterFeed>): Promise<RoasterFeed> {
+  const [feed, skipped] = await collectSkipped(fn);
+  return { ...feed, skipped: skipped.map((t) => preferLatin(t)) };
 }
 
 /** Read a roaster whose platform we already know. */
-export async function fetchFeed(source: FeedSource): Promise<RoasterFeed> {
+export function fetchFeed(source: FeedSource): Promise<RoasterFeed> {
+  return withSkipped(() => fetchFeedInner(source));
+}
+
+/** Work out how to read a store from whatever link someone pasted. */
+export function detectFeed(rawUrl: string): Promise<RoasterFeed> {
+  return withSkipped(() => detectFeedInner(rawUrl));
+}
+
+async function fetchFeedInner(source: FeedSource): Promise<RoasterFeed> {
   const loaders: Record<Platform, (url: string) => Promise<{ products: Product[]; siteName: string | null }>> = {
     shopify: fetchShopify,
     woocommerce: fetchWooCommerce,
@@ -73,11 +116,8 @@ async function detectSquarespace(url: string, html: string): Promise<RoasterFeed
   return null;
 }
 
-/**
- * Work out how to read a store from whatever link someone pasted: homepage,
- * shop page, or collection. Cheapest, most reliable checks go first.
- */
-export async function detectFeed(rawUrl: string): Promise<RoasterFeed> {
+// Homepage, shop page or collection link: cheapest, most reliable checks go first.
+async function detectFeedInner(rawUrl: string): Promise<RoasterFeed> {
   const url = normalizeUrl(rawUrl);
   const origin = new URL(url).origin;
 
@@ -111,6 +151,13 @@ export async function detectFeed(rawUrl: string): Promise<RoasterFeed> {
   if (page.status >= 400) throw new FetchError(`The site returned an error (${page.status}). Is the link right?`, page.status);
   const html = page.body;
 
+  // The page is Shopify but /products.json didn't answer the first time. That's
+  // usually a momentary block or rate limit, so try once more before falling back.
+  if (isShopifyHtml(html)) {
+    const retry = await fetchShopify(url).catch(() => null);
+    if (retry && retry.products.length > 0) return finish({ platform: "shopify", feedUrl: url }, retry.siteName, retry.products);
+  }
+
   if (isSquarespaceHtml(html)) {
     const sqs = await detectSquarespace(url, html);
     if (sqs) return sqs;
@@ -120,7 +167,7 @@ export async function detectFeed(rawUrl: string): Promise<RoasterFeed> {
   const generic = await fetchJsonLd(url, html);
   if (generic.products.length > 0) return finish({ platform: "jsonld", feedUrl: url }, generic.siteName, generic.products);
 
-  if (isShopifyHtml(html)) throw new FetchError("This Shopify store has its product feed turned off, so we can't read it.");
+  if (isShopifyHtml(html)) throw new FetchError("This Shopify store didn't share its product list just now. Try again in a minute.");
   throw new FetchError(
     "We couldn't find any coffees on that page. Try pasting the link to the roaster's shop or coffee page instead of the homepage.",
   );

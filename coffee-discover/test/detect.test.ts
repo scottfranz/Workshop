@@ -38,6 +38,7 @@ describe("detectFeed", () => {
     expect(feed.source).toEqual({ platform: "shopify", feedUrl: "https://roaster.example" });
     expect(feed.siteName).toBe("Roaster Co");
     expect(feed.products).toHaveLength(2);
+    expect(feed.skipped).toEqual(["Comandante C40 Grinder", "Digital Gift Card"]);
   });
 
   it("detects Big Cartel's array-shaped products.json", async () => {
@@ -96,6 +97,33 @@ describe("detectFeed", () => {
       "https://roaster.example/": { status: 302, body: "", location: "http://10.1.2.3/" },
     });
     await expect(detectFeed("roaster.example")).rejects.toThrow(/public internet/);
+  });
+});
+
+describe("resilience", () => {
+  it("retries a Shopify store whose products.json hiccupped", async () => {
+    let attempts = 0;
+    vi.stubGlobal("fetch", vi.fn(async (input: URL | string) => {
+      const url = String(input);
+      if (url.startsWith("https://flaky.example/products.json")) {
+        attempts++;
+        return attempts <= 2
+          ? new Response("slow down", { status: 429 })
+          : new Response(JSON.stringify(fx.shopifyProducts), { headers: { "content-type": "application/json" } });
+      }
+      if (url === "https://flaky.example/") return new Response('<script src="//cdn.shopify.com/x.js"></script>', { headers: { "content-type": "text/html" } });
+      return new Response("nope", { status: 404 });
+    }));
+    const feed = await detectFeed("flaky.example");
+    expect(feed.source.platform).toBe("shopify");
+    expect(feed.products).toHaveLength(2);
+  });
+
+  it("cleans bilingual titles in the final feed", async () => {
+    mockSite({
+      "https://jp.example/products.json?limit=250": { body: { products: [{ ...fx.shopifyProducts.products[0], title: "SCAJ - El Espejo. フィンカ・エル・エスペホ" }] } },
+    });
+    expect((await detectFeed("jp.example")).products[0].title).toBe("SCAJ - El Espejo");
   });
 });
 

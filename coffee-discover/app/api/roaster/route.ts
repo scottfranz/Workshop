@@ -42,7 +42,7 @@ export async function GET(req: Request) {
   } catch (err) {
     const message = err instanceof FetchError ? err.message : "Something went wrong reading that store. Try again in a bit.";
     if (!(err instanceof FetchError)) console.error("roaster fetch failed", url, err);
-    // Short cache on errors so a flaky store recovers quickly.
-    return NextResponse.json({ error: message }, { status: 422, headers: { "Cache-Control": "public, s-maxage=120" } });
+    // Never cache errors: a store that hiccupped once should work on the next try.
+    return NextResponse.json({ error: message }, { status: 422, headers: { "Cache-Control": "no-store" } });
   }
 }

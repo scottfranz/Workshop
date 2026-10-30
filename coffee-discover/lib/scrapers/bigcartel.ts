@@ -1,4 +1,4 @@
-import { looksLikeCoffee } from "./filter";
+import { keepCoffee } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
 import { absoluteUrl, minPrice, summarize, toIso } from "./text";
 import type { Product } from "./types";
@@ -13,7 +13,7 @@ interface BigCartelProduct {
   description?: string;
   images?: { url?: string }[];
   categories?: { name?: string }[];
-  options?: { price?: number | string; sold_out?: boolean }[];
+  options?: { name?: string; price?: number | string; sold_out?: boolean }[];
 }
 
 export function isBigCartelList(data: unknown): boolean {
@@ -28,8 +28,8 @@ export function parseBigCartel(data: unknown, feedUrl: string, currency: string 
     const title = (p.name ?? "").trim();
     if (!title) continue;
     const cats = (p.categories ?? []).map((c) => c.name ?? "").join(" ");
-    if (!looksLikeCoffee(title, cats, [])) continue;
     const options = p.options ?? [];
+    if (!keepCoffee({ title, productType: cats, description: p.description, options: options.map((o) => o.name ?? "") })) continue;
     products.push({
       id: String(p.id),
       title,

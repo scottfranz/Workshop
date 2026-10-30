@@ -1,6 +1,6 @@
-import { looksLikeCoffee } from "./filter";
+import { keepCoffee } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
-import { absoluteUrl, minPrice, summarize, toIso, toNumber } from "./text";
+import { absoluteUrl, minPrice, stripHtml, summarize, toIso, toNumber } from "./text";
 import type { Product } from "./types";
 
 // Squarespace pages return their content as JSON when you add ?format=json.
@@ -12,6 +12,8 @@ interface SqsVariant {
   price?: number; salePrice?: number; onSale?: boolean; qtyInStock?: number; unlimited?: boolean;
   priceMoney?: SqsMoney; salePriceMoney?: SqsMoney;
   stock?: { quantity?: number; unlimited?: boolean };
+  attributes?: Record<string, string>;
+  optionValues?: { optionName?: string; value?: string }[];
 }
 interface SqsItem {
   id?: string;
@@ -75,7 +77,12 @@ export function parseSquarespace(data: unknown, feedUrl: string): Product[] {
     const title = (item.title ?? "").trim();
     const variants = variantsOf(item);
     if (!title || !item.fullUrl || variants.length === 0) continue;
-    if (!looksLikeCoffee(title)) continue;
+    const options = variants.flatMap((v) => [
+      ...Object.entries(v.attributes ?? {}).flat(),
+      ...(v.optionValues ?? []).flatMap((o) => [o.optionName ?? "", o.value ?? ""]),
+    ]);
+    const description = stripHtml(`${item.excerpt ?? ""} ${item.body ?? ""}`);
+    if (!keepCoffee({ title, description, options })) continue;
     products.push({
       id: item.id ?? item.fullUrl,
       title,
