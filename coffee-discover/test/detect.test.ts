@@ -205,6 +205,21 @@ describe("detectFeed", () => {
     expect(byTitle["HIFLUX PURITY Filters"]).toBeUndefined();
   });
 
+  it("reads Wix Stores galleries, loading all pages and checking unclear products", async () => {
+    mockSite({
+      "https://curious.example/": { body: fx.wixHome },
+      "https://curious.example/?page=3": { body: fx.wixAllPages },
+      "https://curious.example/product-page/strawberries-and-chocolate": { body: fx.wixStrawberriesPage },
+    });
+    const feed = await detectFeed("curious.example");
+    expect(feed.source.platform).toBe("wix");
+    // The subscription and t-shirts are left out; "strawberries and chocolate" is kept after reading its page.
+    expect(feed.products.map((p) => p.title).sort()).toEqual(["Fazenda Matão", "Marlon Bolaños - pink bourbon honey", "strawberries and chocolate"]);
+    expect(feed.products.find((p) => p.title === "Fazenda Matão")).toMatchObject({
+      price: 18.5, currency: "USD", url: "https://curious.example/product-page/fazenda-mat-o", image: "https://static.wixstatic.com/media/5.png",
+    });
+  });
+
   it("falls back to JSON-LD and crawls listed product pages", async () => {
     mockSite({
       "https://riverbend.example/shop": { body: fx.jsonLdListingHtml },

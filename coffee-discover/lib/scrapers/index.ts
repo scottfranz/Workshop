@@ -5,6 +5,7 @@ import { BLOCKED_MESSAGE, FetchError, isBlocked, parseJsonBody, safeFetchJson, s
 import { fetchSquare, isSquareOnlineHtml } from "./square";
 import { fetchStorefront, isStorefrontHtml } from "./storefront";
 import { fetchSubbly, isSubblyHtml } from "./subbly";
+import { fetchWix, isWixStoresHtml } from "./wix";
 import { fetchShopify, parseShopify, shopifyProductsEndpoint } from "./shopify";
 import {
   SQUARESPACE_SHOP_GUESSES, fetchSquarespace, isSquarespaceProductPage, parseSquarespace, siteTitle, withFormatJson,
@@ -15,7 +16,7 @@ import { fetchWooCommerce, parseWooCommerce, wooEndpoint } from "./woocommerce";
 
 const MAX_PRODUCTS = 300;
 
-export const PLATFORMS: Platform[] = ["shopify", "storefront", "woocommerce", "squarespace", "square", "subbly", "bigcartel", "jsonld"];
+export const PLATFORMS: Platform[] = ["shopify", "storefront", "woocommerce", "squarespace", "square", "subbly", "wix", "bigcartel", "jsonld"];
 
 export function normalizeUrl(raw: string): string {
   let s = raw.trim();
@@ -206,6 +207,7 @@ async function fetchFeedInner(source: FeedSource, opts: FeedOptions): Promise<Ro
     square: (url) => fetchSquare(url),
     storefront: (url) => fetchStorefront(url),
     subbly: (url) => fetchSubbly(url),
+    wix: (url) => fetchWix(url),
     bigcartel: fetchBigCartel,
     jsonld: (url) => fetchJsonLd(url),
   };
@@ -318,6 +320,11 @@ async function detectFeedInner(rawUrl: string, followedMove = false, opts: FeedO
   if (isShopifyHtml(html)) {
     const retry = await fetchShopify(url, opts.currency).catch(() => null);
     if (retry && retry.products.length > 0) return finish({ platform: "shopify", feedUrl: url }, retry.siteName, retry.products);
+  }
+
+  if (isWixStoresHtml(html)) {
+    const wx = await fetchWix(url, html).catch(() => null);
+    if (wx && wx.products.length > 0) return finish({ platform: "wix", feedUrl: url }, wx.siteName, wx.products);
   }
 
   if (isSubblyHtml(html)) {

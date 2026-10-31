@@ -171,3 +171,20 @@ export const subblyShopHtml = `<!doctype html><html lang="en"><head><title>Shop 
 3b:["$","div","p",${JSON.stringify(subblyRecord(2, "gamma", "Gamma", "Bright and sweet.", [["300g", 2200, 1766], ["2kg", 12500, 461]]))}]
 3c:["$","div","p",${JSON.stringify(subblyRecord(3, "hiflux", "HIFLUX PURITY Filters", "Paper filters.", [["Flat Bottom Wave 155", 2000, 58]]))}]
 3d:["$","div","p",${JSON.stringify(subblyRecord(4, "sold", "Rumudamo Washed", "Natural process lot.", [["300g", 3400, 0], ["2kg", 15000, 5]]))}]`)}])</script></body></html>`;
+
+// Wix Stores: the gallery's products in wix-warmup-data; ?page=N holds pages 1..N.
+const wixItem = (id: string, name: string, price: number, inStock = true) => ({
+  id, name, urlPart: name.toLowerCase().replace(/[^a-z0-9]+/g, "-"), price, currency: "USD", isInStock: inStock, productType: "physical",
+  media: [{ fullUrl: `https://static.wixstatic.com/media/${id}.png` }], options: [],
+});
+const wixPage = (items: unknown[], total: number) => `<!doctype html><html><head><title>Curious Coffee | specialty coffee</title></head><body>
+<script type="application/json" id="wix-warmup-data">${JSON.stringify({ appsWarmupData: { stores: { initialData: { catalog: { category: {
+  productsWithMetaData: { list: items, totalCount: total } } } } } } })}</script>
+<link href="https://static.parastorage.com/services/wixstores-client-gallery/x.css"></body></html>`;
+const wixAll = [
+  wixItem("1", "Marlon Bolaños - pink bourbon honey", 28.5), wixItem("2", "monthly coffee subscription", 110),
+  wixItem("3", "strawberries and chocolate", 19.5), wixItem("4", "curious t-shirts", 29.5), wixItem("5", "Fazenda Matão", 18.5),
+];
+export const wixHome = wixPage(wixAll.slice(0, 2), wixAll.length);
+export const wixAllPages = wixPage(wixAll, wixAll.length);
+export const wixStrawberriesPage = `<script type="application/ld+json">${JSON.stringify({ "@type": "Product", name: "strawberries and chocolate", description: "A co-fermented Colombian lot. Tasting notes: strawberry, chocolate." })}</script>`;
