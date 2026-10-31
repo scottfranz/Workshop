@@ -1,6 +1,6 @@
 import type { BagSize } from "./text";
 
-export type Platform = "shopify" | "storefront" | "woocommerce" | "squarespace" | "square" | "subbly" | "bigcartel" | "jsonld";
+export type Platform = "shopify" | "storefront" | "woocommerce" | "squarespace" | "square" | "subbly" | "wix" | "bigcartel" | "jsonld";
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   shopify: "Shopify",
@@ -9,6 +9,7 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   squarespace: "Squarespace",
   square: "Square Online",
   subbly: "Subbly",
+  wix: "Wix",
   bigcartel: "Big Cartel",
   jsonld: "Web page",
 };

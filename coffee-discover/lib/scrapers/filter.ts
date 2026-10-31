@@ -21,7 +21,7 @@ export interface ProductSignals {
 // Words that mean "not a bag of coffee" wherever they appear in a title.
 const NON_COFFEE_TITLE = [
   // gift cards, subscriptions, services
-  "gift card", "giftcard", "e-gift", "gift certificate", "subscription", "subscribe", "sub", "membership",
+  "gift card", "giftcard", "e-gift", "gift certificate", "subscription", "subscribe", "sub", "membership", "coffee club",
   "abonnement", "abonnemang", "abo", "gaveabonnement", "gavekort", "presentkort", "gutschein", "geschenkkarte", "carte cadeau",
   "class", "workshop", "ticket", "donation", "tip jar", "shipping protection", "route package", "wholesale",
   // not sold to the public: café, staff and partner products
@@ -30,7 +30,7 @@ const NON_COFFEE_TITLE = [
   "grinder", "grinders", "dripper", "drippers", "kettle", "scale", "filter", "filters", "carafe", "decanter", "brewer", "chemex", "aeropress",
   "v60", "kalita", "origami", "french press", "moka", "espresso machine", "tamper", "portafilter", "puck screen",
   "screen", "distribution tool", "distributor", "wdt", "leveler", "dosing cup", "dosing ring", "funnel", "knock box",
-  "shaker", "cellar", "cellars",
+  "shaker", "cellar", "cellars", "coffee maker", "espresso maker", "maker", "water drops", "mypressi",
   // the same in French, German and Scandinavian shops
   "moulin", "moulins", "meules", "bouilloire", "tasse", "tasses", "soucoupe", "théière", "cafetière", "pichet",
   "verre", "cuillère", "brosse", "filtres", "casquette", "tablier", "mühle", "kaffeemühle", "wasserkocher", "waage",
@@ -40,9 +40,10 @@ const NON_COFFEE_TITLE = [
   // water and minerals
   "aquacode", "third wave water", "lotus water", "water packet", "water packets", "mineral", "minerals", "brewing water",
   // drinkware and merch
-  "mug", "tumbler", "glass", "glasses", "cups", "shirt", "tee", "t-shirt", "hoodie", "sweatshirt", "crewneck", "hat",
-  "beanie", "cap", "tote", "sticker", "stickers", "poster", "print", "pin", "patch", "keychain", "postcard", "socks",
-  "apron", "candle",
+  "mug", "mugs", "tumbler", "tumblers", "glass", "glasses", "cups", "shirt", "shirts", "tee", "tees", "t-shirt", "t-shirts",
+  "hoodie", "hoodies", "sweatshirt", "sweatshirts", "crewneck", "hat", "hats", "beanie", "beanies", "cap", "caps", "tote",
+  "totes", "sticker", "stickers", "poster", "posters", "print", "prints", "pin", "pins", "patch", "patches", "keychain",
+  "postcard", "postcards", "info card", "info cards", "card set", "socks", "apron", "aprons", "candle", "candles",
   // reading
   "book", "books", "atlas", "handbook", "magazine", "zine",
   // other drinks and food
@@ -75,7 +76,7 @@ const COFFEE_WORDS = [
   // varieties
   "gesha", "geisha", "bourbon", "typica", "caturra", "catuai", "pacamara", "sl28", "sl34", "sidra", "heirloom",
   "castillo", "maragogype", "wush wush", "74158", "mokka", "laurina", "eugenioides", "catimor", "parainema", "ruiru",
-  "batian", "landrace",
+  "batian", "landrace", "sydra", "chiroso", "fazenda", "finca", "hacienda",
   // processing
   "washed", "natural", "honey", "anaerobic", "carbonic", "wet hulled", "wet-hulled", "semi-washed", "pulped",
   "co-ferment", "coferment", "thermal shock", "swiss water", "sugarcane", "mountain water", "decaf",
@@ -122,7 +123,14 @@ export function titleSaysCoffee(title: string): boolean {
   return anyPhrase(t, ORIGINS) || anyPhrase(t, COFFEE_WORDS) || hasPhrase(t, "coffee");
 }
 
+export type CoffeeVerdict = "coffee" | "not" | "unknown";
+
 export function looksLikeCoffee(input: ProductSignals | string): boolean {
+  return coffeeVerdict(input) === "coffee";
+}
+
+/** "unknown" means nothing pointed either way, so a closer look (e.g. the product page) can decide. */
+export function coffeeVerdict(input: ProductSignals | string): CoffeeVerdict {
   const s: ProductSignals = typeof input === "string" ? { title: input } : input;
   const title = s.title.toLowerCase();
   const type = (s.productType ?? "").toLowerCase();
@@ -134,32 +142,32 @@ export function looksLikeCoffee(input: ProductSignals | string): boolean {
   const titleForBlocklist = title.replace(/cup of excellence|filter roast|for filter|espresso roast|omni roast/g, " ");
 
   // Hard no: the title names a non-coffee thing, or the store files it under gear/merch/books/etc.
-  if (anyPhrase(titleForBlocklist, NON_COFFEE_TITLE) || hasPhrase(titleForBlocklist, "cup")) return false;
+  if (anyPhrase(titleForBlocklist, NON_COFFEE_TITLE) || hasPhrase(titleForBlocklist, "cup")) return "not";
   // Compound words (Norwegian/Danish/Swedish/German) hide these inside longer words: "kaffeabonnement".
-  if (/abonnement|abonnemang|gavekort|presentkort|gutschein/.test(title)) return false;
+  if (/abonnement|abonnemang|gavekort|presentkort|gutschein/.test(title)) return "not";
   // A gear word in the category wins, so "Coffee Equipment" or "Coffee Grinders" isn't coffee.
-  if (type !== "" && NON_COFFEE_TYPE.some((w) => type.includes(w))) return false;
+  if (type !== "" && NON_COFFEE_TYPE.some((w) => type.includes(w))) return "not";
   const typeSaysCoffee = type !== "" && anyPhrase(type, COFFEE_TYPE);
-  if (/(^|\|\s*)(merch|merchandise|gear|equipment|accessories|apparel|books?|water|tools?|brew gear)(\s*\||$)/.test(tags)) return false;
+  if (/(^|\|\s*)(merch|merchandise|gear|equipment|accessories|apparel|books?|water|tools?|brew gear)(\s*\||$)/.test(tags)) return "not";
   // Tags or vendor marking wholesale, café-only, partner or hidden products.
   // Tags marking café-only, partner or hidden products. ("wholesale" alone isn't enough:
   // many roasters tag retail coffees that way so they also appear in a wholesale portal.)
-  if (/(^|\|\s*)(white[- ]label|cafe[- ]only|café[- ]only|utility[- ]sku|private|unlisted|hidden)(\s*\||$)/.test(tags)) return false;
+  if (/(^|\|\s*)(white[- ]label|cafe[- ]only|café[- ]only|utility[- ]sku|private|unlisted|hidden)(\s*\||$)/.test(tags)) return "not";
   // Explicitly wholesale-only. A plain "wholesale"/"b2b" tag usually means "also sold
   // to wholesale customers" (Helm, Hex, Sweet Bloom retail bags carry it), so it isn't enough.
-  if (/wholesale[\s_-]*(only|exclusive)|b2b[\s_-]*only|trade[\s_-]*only/.test(tags)) return false;
-  if (/wholesale/i.test(s.vendor ?? "")) return false;
-  if (s.vendor && anyPhrase(s.vendor.toLowerCase(), GEAR_BRANDS)) return false;
+  if (/wholesale[\s_-]*(only|exclusive)|b2b[\s_-]*only|trade[\s_-]*only/.test(tags)) return "not";
+  if (/wholesale/i.test(s.vendor ?? "")) return "not";
+  if (s.vendor && anyPhrase(s.vendor.toLowerCase(), GEAR_BRANDS)) return "not";
 
   // Yes if anything positively says coffee.
-  if (typeSaysCoffee) return true;
-  if (WEIGHT.test(options) || GRIND.test(options)) return true;
-  if (anyPhrase(title, ORIGINS) || anyPhrase(title, COFFEE_WORDS) || hasPhrase(title, "coffee")) return true;
-  if (anyPhrase(tags, ORIGINS) || anyPhrase(tags, COFFEE_WORDS)) return true;
-  if (anyPhrase(description, DESCRIPTION_WORDS) || anyPhrase(description, ORIGINS)) return !anyPhrase(description, GEAR_DESCRIPTION);
+  if (typeSaysCoffee) return "coffee";
+  if (WEIGHT.test(options) || GRIND.test(options)) return "coffee";
+  if (anyPhrase(title, ORIGINS) || anyPhrase(title, COFFEE_WORDS) || hasPhrase(title, "coffee")) return "coffee";
+  if (anyPhrase(tags, ORIGINS) || anyPhrase(tags, COFFEE_WORDS)) return "coffee";
+  if (anyPhrase(description, DESCRIPTION_WORDS) || anyPhrase(description, ORIGINS)) return anyPhrase(description, GEAR_DESCRIPTION) ? "not" : "coffee";
 
-  // No evidence either way: leave it out rather than show gear.
-  return false;
+  // No evidence either way: leave it out rather than show gear, unless a closer look finds some.
+  return "unknown";
 }
 
 // Titles the filter rejected during the current request, so visitors can see

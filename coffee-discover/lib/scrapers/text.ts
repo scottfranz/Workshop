@@ -127,13 +127,21 @@ export interface PricedOption {
   available?: boolean;
 }
 
+/** "10oz Case Pack (6)", "Pack of 3", "3 x 250 g": several bags sold together. */
+export function isMultiPack(label: string): boolean {
+  return /case\s*pack|\bcase of\b|\bpack of\b|\(\s*\d+\s*\)|\b\d+\s*[x×]\s*\d|\b[x×]\s*\d+\b|\b\d+[- ]?pack\b/i.test(label);
+}
+
 /**
  * The bag a shopper would actually buy: in stock if any are, not a tiny sample
  * if bigger sizes exist, then the cheapest. Its price and size go together so
  * price-per-cup is computed from the same bag.
  */
 export function pickBag(options: PricedOption[], fallbackLabel?: string): { price: number | null; size: BagSize | null } {
-  const priced = options.map((o) => ({ ...o, value: toNumber(o.price) })).filter((o) => o.value !== null && o.value > 0);
+  const positive = options.map((o) => ({ ...o, value: toNumber(o.price) })).filter((o) => o.value !== null && o.value > 0);
+  // Case packs (Onyx's "10oz Case Pack (6)") aren't the bag; use them only if nothing else is sold.
+  const single = positive.filter((o) => !isMultiPack(o.label));
+  const priced = single.length ? single : positive;
   if (priced.length === 0) return { price: null, size: parseBagSize(fallbackLabel) };
   const inStock = priced.filter((o) => o.available !== false);
   let pool = (inStock.length ? inStock : priced).map((o) => ({ ...o, size: parseBagSize(o.label) }));
@@ -161,6 +169,8 @@ const BULK_GRAMS = 900;
  */
 export function retailInStock(options: { label: string; available?: boolean }[]): boolean {
   if (options.length === 0) return true;
+  const single = options.filter((o) => !isMultiPack(o.label));
+  if (single.length) options = single;
   const sized = options.map((o) => ({ ...o, grams: parseBagSize(o.label)?.grams ?? null }));
   const retail = sized.filter((o) => o.grams !== null && o.grams < BULK_GRAMS);
   const bulk = sized.filter((o) => o.grams !== null && o.grams >= BULK_GRAMS);

@@ -438,3 +438,93 @@ describe("generic crawler", () => {
     expect(products[0]).toMatchObject({ price: 17.36, currency: "EUR", size: { grams: 250, label: "250 g" }, available: true });
   });
 });
+
+describe("bag choice: case packs and archived products", () => {
+  it("picks the cheapest full-size bag", async () => {
+    const { pickBag } = await import("@/lib/scrapers/text");
+    expect(pickBag([{ label: "40g", price: "7.00" }, { label: "250g", price: "28.00" }, { label: "1kg", price: "98.00" }]).price).toBe(28);
+    expect(pickBag([{ label: "10 oz", price: "21.50" }, { label: "2 lb", price: "56.50" }]).price).toBe(21.5);
+  });
+  it("ignores case packs when choosing the bag (Onyx)", async () => {
+    const { pickBag, retailInStock } = await import("@/lib/scrapers/text");
+    const sizes = [
+      { label: "2oz", price: "6.00" }, { label: "10oz", price: "22.50" }, { label: "2lbs", price: "59.50" },
+      { label: "5lbs", price: "124.00" }, { label: "10oz Case Pack (6)", price: "120.00" }, { label: "5lbs Case Pack (8)", price: "960.00" },
+    ];
+    expect(pickBag(sizes)).toEqual({ price: 22.5, size: { grams: 283, label: "10 oz" } });
+    expect(retailInStock(sizes.map((s) => ({ ...s, available: true })))).toBe(true);
+  });
+  it("treats Archived Shopify products as sold out", () => {
+    const data = { products: [{ ...fx.shopifyProducts.products[0], tags: ["Archived", "Reserve Lot"] }] };
+    expect(parseShopify(data, "https://r.example")[0].available).toBe(false);
+  });
+});
+
+describe("Hydrogen storefronts (sizes the site actually offers)", () => {
+  // Remix's turbo-stream: a flat array, objects as {"_<key index>": <value index>}.
+  function encode(value: unknown): string {
+    const flat: unknown[] = [];
+    const put = (v: unknown): number => {
+      const i = flat.length;
+      flat.push(null);
+      if (Array.isArray(v)) flat[i] = v.map(put);
+      else if (v && typeof v === "object") {
+        const o: Record<string, number> = {};
+        for (const [k, val] of Object.entries(v)) { const key = put(k); o[`_${key}`] = val === null ? -5 : put(val); }
+        flat[i] = o;
+      } else flat[i] = v;
+      return i;
+    };
+    put(value);
+    const chunk = JSON.stringify(JSON.stringify(flat) + "\n");
+    return `<script>window.__reactRouterContext.streamController.enqueue(${chunk});</script><img src="https://cdn.shopify.com/x.png">`;
+  }
+  const page = encode({
+    loaderData: {
+      "routes/_page.collections.$handle": {
+        collection: { products: { nodes: [
+          { id: "gid://shopify/Product/1", handle: "agaro", title: "Agaro", variants: { nodes: [{ title: "250 g" }, { title: "2 lb" }] } },
+          { id: "gid://shopify/Product/2", handle: "coe-lot", title: "CoE Lot", variants: { nodes: [{ title: "125 g" }] } },
+        ] } },
+      },
+    },
+  });
+
+  it("reads the sizes listed in the page data", async () => {
+    const { shownVariantTitles, turboStreamData } = await import("@/lib/scrapers/hydrogen");
+    const shown = shownVariantTitles(turboStreamData(page));
+    expect([...shown.get("agaro")!]).toEqual(["250 g", "2 lb"]);
+    expect([...shown.get("coe-lot")!]).toEqual(["125 g"]);
+  });
+
+  it("prices only the sizes the site sells", async () => {
+    const { shownVariantTitles, turboStreamData } = await import("@/lib/scrapers/hydrogen");
+    const shown = shownVariantTitles(turboStreamData(page));
+    shown.set("holiday", new Set());
+    shown.set("burundi", new Set(["310 g", "2 lb"]));
+    const coffee = (handle: string, variants: [string, string][]) => ({
+      id: handle, handle, title: handle, product_type: "Coffee", tags: ["coffee"],
+      variants: variants.map(([title, price]) => ({ title, price, available: true })),
+    });
+    const data = { products: [
+      coffee("agaro", [["125 g", "10.00"], ["250 g", "19.80"], ["2 lb", "52.00"]]),
+      coffee("coe-lot", [["125 g", "35.00"], ["2 lb", "159.75"]]),
+      coffee("holiday", [["125 g", "10.00"], ["310 g", "20.00"]]),
+      // The 310 g bag is cheaper per gram than the 2 lb: still the bag.
+      coffee("burundi", [["125 g", "10.00"], ["310 g", "19.00"], ["2 lb", "62.00"]]),
+    ] };
+    const byHandle = Object.fromEntries(parseShopify(data, "https://r.example", "USD", null, shown).map((p) => [p.url.split("/").pop(), p]));
+    expect(byHandle.agaro).toMatchObject({ price: 19.8, size: { label: "250 g" }, available: true });
+    expect(byHandle["coe-lot"]).toMatchObject({ price: 35, size: { label: "125 g" } });
+    // Its page won't show it: not on sale.
+    expect(byHandle.holiday.available).toBe(false);
+    expect(byHandle.burundi).toMatchObject({ price: 19, size: { label: "310 g" }, available: true });
+  });
+
+  it("only treats Remix pages with Shopify content as Hydrogen", async () => {
+    const { isHydrogenHome } = await import("@/lib/scrapers/hydrogen");
+    const res = (body: string) => ({ url: "https://r.example/", status: 200, contentType: "text/html", body });
+    expect(isHydrogenHome(res(page))).toBe(true);
+    expect(isHydrogenHome(res("<html>cdn.shopify.com</html>"))).toBe(false);
+  });
+});
