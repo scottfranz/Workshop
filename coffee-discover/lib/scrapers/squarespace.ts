@@ -1,6 +1,6 @@
 import { keepCoffee, searchTextFor } from "./filter";
 import { FetchError, safeFetchJson } from "./safeFetch";
-import { absoluteUrl, pickBag, stripHtml, summarize, toIso, toNumber } from "./text";
+import { absoluteUrl, pickBag, retailInStock, stripHtml, summarize, toIso, toNumber } from "./text";
 import type { Product } from "./types";
 
 // Squarespace pages return their content as JSON when you add ?format=json.
@@ -98,7 +98,10 @@ export function parseSquarespace(data: unknown, feedUrl: string): Product[] {
         return { price: bag.price, size: bag.size };
       })(),
       currency: variants.find((v) => v.priceMoney?.currency)?.priceMoney?.currency ?? pageCurrency,
-      available: variants.some(variantInStock),
+      available: retailInStock(variants.map((v) => ({
+        available: variantInStock(v),
+        label: [...Object.values(v.attributes ?? {}), ...(v.optionValues ?? []).map((o) => o.value ?? "")].join(" "),
+      }))),
       publishedAt: toIso(item.publishOn ?? item.addedOn),
       description: summarize(item.excerpt || item.body),
       searchText: searchTextFor(signals),

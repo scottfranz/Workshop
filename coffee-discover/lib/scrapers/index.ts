@@ -49,6 +49,18 @@ function isRealPrice(p: Product): boolean {
   return false;
 }
 
+/** The same address with "www." added or removed. */
+function otherWww(url: string): string {
+  const u = new URL(url);
+  u.hostname = u.hostname.startsWith("www.") ? u.hostname.slice(4) : `www.${u.hostname}`;
+  return normalizeUrl(u.toString());
+}
+
+async function hasShopifyFeed(url: string): Promise<boolean> {
+  const res = await safeFetchJson(`${shopifyProductsEndpoint(url)}?limit=1`).catch(() => null);
+  return Array.isArray((res?.data as { products?: unknown } | undefined)?.products);
+}
+
 function finish(source: FeedSource, siteName: string | null, products: Product[]): RoasterFeed {
   return {
     source,
@@ -171,6 +183,14 @@ async function detectFeedInner(rawUrl: string, followedMove = false, opts: FeedO
     return finish(source, full.siteName, full.products);
   }
 
+  // 2b. Some stores run a custom-built site on one host and the regular Shopify
+  //     store on the other: drinkpassenger.com (custom) vs www.drinkpassenger.com.
+  const alternate = otherWww(url);
+  if (await hasShopifyFeed(alternate)) {
+    const full = await fetchShopify(alternate, opts.currency);
+    return finish({ platform: "shopify", feedUrl: alternate }, full.siteName, full.products);
+  }
+
   // 3. Everything else needs the page itself.
   const page = await safeFetchText(url, "text/html");
   if (isBlocked(page)) throw new FetchError(BLOCKED_MESSAGE, page.status);
@@ -181,6 +201,17 @@ async function detectFeedInner(rawUrl: string, followedMove = false, opts: FeedO
   const landedOn = new URL(page.url);
   if (!followedMove && landedOn.hostname.replace(/^www\./, "") !== new URL(url).hostname.replace(/^www\./, "")) {
     return detectFeedInner(landedOn.origin + new URL(url).pathname, true, opts);
+  }
+
+  // Custom-built Shopify sites often name their store's own address (x.myshopify.com),
+  // where the regular product feed may still be served.
+  const shopHost = html.match(/\b[a-z0-9][a-z0-9-]*\.myshopify\.com\b/)?.[0];
+  if (shopHost && shopHost !== new URL(url).hostname) {
+    const shopUrl = `https://${shopHost}${new URL(url).pathname === "/" ? "" : new URL(url).pathname}`;
+    if (await hasShopifyFeed(shopUrl)) {
+      const full = await fetchShopify(shopUrl, opts.currency);
+      if (full.products.length > 0) return finish({ platform: "shopify", feedUrl: shopUrl }, full.siteName, full.products);
+    }
   }
 
   // Headless Shopify: no /products.json, but pages embed Storefront API product data.

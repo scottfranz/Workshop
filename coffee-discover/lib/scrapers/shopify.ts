@@ -1,6 +1,6 @@
 import { keepCoffee, noteSkipped, searchTextFor, titleSaysCoffee } from "./filter";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
-import { absoluteUrl, pickBag, stripHtml, summarize, toIso } from "./text";
+import { absoluteUrl, pickBag, retailInStock, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
 
 interface ShopifyProduct {
@@ -53,10 +53,8 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       noteSkipped(title);
       continue;
     }
-    const bag = pickBag(
-      variants.map((v) => ({ price: v.price, available: v.available, label: [v.title, v.option1, v.option2, v.option3].filter(Boolean).join(" ") })),
-      title,
-    );
+    const priced = variants.map((v) => ({ price: v.price, available: v.available, label: [v.title, v.option1, v.option2, v.option3].filter(Boolean).join(" ") }));
+    const bag = pickBag(priced, title);
     products.push({
       id: String(p.id),
       title,
@@ -65,7 +63,7 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       price: bag.price,
       size: bag.size,
       currency,
-      available: variants.length === 0 ? true : variants.some((v) => v.available !== false),
+      available: retailInStock(priced),
       publishedAt: toIso(p.published_at ?? p.created_at),
       description: summarize(p.body_html),
       searchText: searchTextFor(signals),

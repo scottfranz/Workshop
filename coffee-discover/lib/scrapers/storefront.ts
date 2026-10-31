@@ -5,7 +5,7 @@
 
 import { keepCoffee, searchTextFor } from "./filter";
 import { FetchError, safeFetchText } from "./safeFetch";
-import { absoluteUrl, decodeEntities, pickBag, stripHtml, summarize, toIso } from "./text";
+import { absoluteUrl, decodeEntities, pickBag, retailInStock, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
 
 const MAX_COLLECTIONS = 6;
@@ -146,7 +146,10 @@ export function parseStorefront(html: string, pageUrl: string): Product[] {
       price: bag.price,
       size: bag.size,
       currency,
-      available: p.availableForSale ?? variants.some((v) => v.availableForSale !== false),
+      available: p.availableForSale !== false && retailInStock(variants.map((v) => ({
+        available: v.availableForSale,
+        label: [v.title, ...(v.selectedOptions ?? []).map((o) => o.value)].filter(Boolean).join(" "),
+      }))),
       publishedAt: toIso(p.publishedAt ?? p.createdAt),
       description: summarize(p.descriptionHtml ?? p.description),
       searchText: searchTextFor(signals),
