@@ -367,7 +367,7 @@ export function Feed() {
         {shareNote && (
           <p className="notice" role="status">
             {shareNote}{" "}
-            <button type="button" className="dismiss" aria-label="Dismiss" title="Dismiss" onClick={() => setShareNote(null)}>×</button>
+            <button type="button" className="btn btn-ghost" style={{ minHeight: 28 }} onClick={() => setShareNote(null)}>OK</button>
           </p>
         )}
 
@@ -379,7 +379,7 @@ export function Feed() {
                 : "No new roasters were added."}
             </span>
             {linkImport.added.length > 0 && <button type="button" className="btn" onClick={undoImport}>Undo</button>}
-            <button type="button" className="dismiss" aria-label="Dismiss" title="Dismiss" onClick={() => setLinkImport(null)}>×</button>
+            <button type="button" className="btn btn-ghost" style={{ marginLeft: linkImport.added.length ? 0 : undefined }} onClick={() => setLinkImport(null)}>OK</button>
           </div>
         )}
 
