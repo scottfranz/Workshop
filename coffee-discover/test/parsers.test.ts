@@ -310,3 +310,24 @@ describe("bag size", () => {
     expect(parseShopify(data, "https://r.example")[0]).toMatchObject({ price: 28, size: { grams: 250, label: "250 g" } });
   });
 });
+
+describe("retail vs bulk stock", () => {
+  it("treats a coffee as sold out when only bulk sizes remain", async () => {
+    const { retailInStock } = await import("@/lib/scrapers/text");
+    // Sweet Bloom's Hirwa: 10 oz sold out, 2 lb "available", 5 lb sold out.
+    expect(retailInStock([{ label: "10oz Whole Bean", available: false }, { label: "2lb Whole Bean", available: true }, { label: "5lb Whole Bean", available: false }])).toBe(false);
+    expect(retailInStock([{ label: "10 oz", available: true }, { label: "5 lb", available: false }])).toBe(true);
+    // Green coffee sold only in bulk: judged on its own sizes.
+    expect(retailInStock([{ label: "2 lb", available: false }, { label: "10 lb", available: true }])).toBe(true);
+    // No sizes at all: any available option counts.
+    expect(retailInStock([{ label: "Default Title", available: true }])).toBe(true);
+    expect(retailInStock([])).toBe(true);
+  });
+
+  it("is applied to Shopify products", () => {
+    const data = { products: [{ ...fx.shopifyProducts.products[0], variants: [
+      { title: "10oz Whole Bean", price: "20.25", available: false }, { title: "2lb Whole Bean", price: "58.00", available: true },
+    ] }] };
+    expect(parseShopify(data, "https://r.example")[0].available).toBe(false);
+  });
+});

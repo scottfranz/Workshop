@@ -146,3 +146,23 @@ export function pickBag(options: PricedOption[], fallbackLabel?: string): { pric
   const best = (full.length ? full : pool).reduce((a, b) => (b.value! < a.value! ? b : a));
   return { price: best.value, size: best.size ?? parseBagSize(fallbackLabel) };
 }
+
+// Bags this size or bigger (2 lb, 1 kg, 5 lb...) are bulk/wholesale sizes.
+const BULK_GRAMS = 900;
+
+/**
+ * Whether a coffee is really buyable. Some roasters leave bulk sizes marked
+ * available after the retail bag sells out (leftover wholesale stock) while
+ * their own site shows the coffee as sold out: Sweet Bloom's Hirwa had its
+ * 10 oz sold out and only a 2 lb "available". So when a coffee has both a
+ * regular bag size and bulk sizes, it counts as in stock only if a regular bag
+ * is. Coffees sold only in bulk (green coffee) are judged on their own sizes.
+ */
+export function retailInStock(options: { label: string; available?: boolean }[]): boolean {
+  if (options.length === 0) return true;
+  const sized = options.map((o) => ({ ...o, grams: parseBagSize(o.label)?.grams ?? null }));
+  const retail = sized.filter((o) => o.grams !== null && o.grams < BULK_GRAMS);
+  const bulk = sized.filter((o) => o.grams !== null && o.grams >= BULK_GRAMS);
+  if (retail.length > 0 && bulk.length > 0) return retail.some((o) => o.available !== false);
+  return options.some((o) => o.available !== false);
+}
