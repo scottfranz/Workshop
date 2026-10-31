@@ -29,6 +29,8 @@ export interface Product {
   publishedAt: string | null;
   /** Short plain-text blurb, usually containing tasting notes. */
   description: string | null;
+  /** Brand the store files the product under (Shopify "vendor"); used server-side only. */
+  vendor?: string;
   /** Extra text search matches against: fuller description, category, tags, sizes, origin/process/variety words. */
   searchText?: string;
 }

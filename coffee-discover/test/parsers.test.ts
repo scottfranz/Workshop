@@ -154,6 +154,8 @@ describe("coffee filter", () => {
     ["Curio", { productType: "Coffee", tags: ["coffee", "type:collaboration", "white-label"] }],
     ["Costa Rica Volcan Azul SL28", { productType: "Coffee", tags: ["coffee", "utility-sku"] }],
     ["Ethiopia Guji", { productType: "Coffee", vendor: "Onyx Coffee Lab (WHOLESALE)" }],
+    ["Bekele Honey, 1kg", { productType: "Coffee", tags: ["custom-badge:Wholesale Exclusive"] }],
+    ["Iced Coffee - 2.5 Kilos", { productType: "Coffee", tags: ["b2bonly"] }],
     ["70% Tanzania | Dark & Lemon Crunch", { productType: "Chocolate", tags: ["chocolate"] }],
     ["Dark Chocolate Covered Espresso Beans", { productType: "Terroir" }],
     ["Golden Milk Latte Powder", {}],
@@ -176,6 +178,8 @@ describe("coffee filter", () => {
     ["Holiday", { productType: "Coffee" }],
     ["Whole Bean Sampler", {}],
     ["Kenya Kiambu", { productType: "Coffee", tags: ["coffee", "wholesale", "single origin"] }],
+    ["House Blend", { productType: "Coffee", tags: ["b2b"], options: ["10oz (285g)", "5lb (2270g)"] }],
+    ["Milkbread", { productType: "Coffee", tags: ["All Coffee", "Blend", "Wholesale"], options: ["10oz", "5lbs"] }],
     ["Finca la Riviera [Pink Bourbon]", { productType: "Cafés", options: ["200g"] }],
     ["Gicherori AA [Washed]", { options: ["200g", "1kg"] }],
     ["Geometry", { productType: "Coffee", tags: ["coffee", "type:blend", "wholesale-coffee"], options: ["10oz", "10oz Case Pack (6)"] }],
@@ -333,5 +337,52 @@ describe("retail vs bulk stock", () => {
       { title: "10oz Whole Bean", price: "20.25", available: false }, { title: "2lb Whole Bean", price: "58.00", available: true },
     ] }] };
     expect(parseShopify(data, "https://r.example")[0].available).toBe(false);
+  });
+});
+
+describe("bulk-only products", () => {
+  const p = (id: string, grams: number | null) => ({
+    id, title: id, url: id, image: null, price: 20, currency: "USD", available: true, publishedAt: null, description: null,
+    size: grams ? { grams, label: `${grams} g` } : null,
+  });
+  it("drops bulk-only items from a roaster that mostly sells regular bags", async () => {
+    const { dropBulkOnly } = await import("@/lib/scrapers");
+    expect(dropBulkOnly([p("a", 250), p("b", 300), p("tin", 4000), p("kilo", 1000), p("set", null)]).map((x) => x.id)).toEqual(["a", "b", "set"]);
+  });
+  it("leaves roasters that mostly sell in bulk alone (green coffee)", async () => {
+    const { dropBulkOnly } = await import("@/lib/scrapers");
+    const green = [p("x", 907), p("y", 4536), p("z", 250)];
+    expect(dropBulkOnly(green)).toBe(green);
+  });
+});
+
+describe("wholesale twins", () => {
+  const p = (id: string, title: string, price: number, grams = 283) => ({
+    id, title, url: id, image: null, price, currency: "USD", available: true, publishedAt: null, description: null, size: { grams, label: `${grams} g` },
+  });
+  it("drops the cheaper same-named copy (Hex's wholesale listings)", async () => {
+    const { dropWholesaleTwins } = await import("@/lib/scrapers");
+    const out = dropWholesaleTwins([p("r", "Gachatha • Washed", 26), p("w", "Gachatha  •  washed", 14.75), p("solo", "Function", 19)]);
+    expect(out.map((x) => x.id)).toEqual(["r", "solo"]);
+  });
+
+  it("drops the rest of a wholesale-only vendor's catalogue too", async () => {
+    const { dropWholesaleTwins } = await import("@/lib/scrapers");
+    const v = (x: ReturnType<typeof p>, vendor: string) => ({ ...x, vendor });
+    const out = dropWholesaleTwins([
+      v(p("r1", "Gachatha", 26), "HEX Coffee"), v(p("w1", "Gachatha", 14.75), "HEX Coffee Roasters"),
+      v(p("r2", "Function", 19), "HEX Coffee"), v(p("w2", "Function", 11.25), "HEX Coffee Roasters"),
+      v(p("w3", "Milkbread", 10.25), "HEX Coffee Roasters"),   // wholesale-only, no retail twin
+      v(p("r3", "Form", 19), "HEX Coffee"),
+    ]);
+    expect(out.map((x) => x.id)).toEqual(["r1", "r2", "r3"]);
+  });
+  it("keeps same-named listings priced alike, or compares per gram", async () => {
+    const { dropWholesaleTwins } = await import("@/lib/scrapers");
+    const roasts = [p("f", "Volcan Azul", 22), p("e", "Volcan Azul", 21)];
+    expect(dropWholesaleTwins(roasts)).toBe(roasts);
+    // Different bag sizes aren't twins: a 1 kg bag is normally cheaper per gram.
+    const sizes = [p("small", "Kenya", 22, 250), p("big", "Kenya", 70, 1000)];
+    expect(dropWholesaleTwins(sizes)).toBe(sizes);
   });
 });

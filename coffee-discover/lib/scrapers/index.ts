@@ -62,15 +62,75 @@ async function hasShopifyFeed(url: string): Promise<boolean> {
   return Array.isArray((res?.data as { products?: unknown } | undefined)?.products);
 }
 
+/**
+ * Some roasters list each product twice: retail, and a wholesale copy with the
+ * same name at a wholesale price (Hex: "Gachatha • Washed" at $26 and $14.75,
+ * often with no wholesale tag at all). Wholesale is typically 30-45% off, so
+ * when same-named listings of the same bag size differ that much, drop the cheaper ones.
+ * Twins priced alike (separate filter/espresso roasts) are both kept.
+ */
+export function dropWholesaleTwins(products: Product[]): Product[] {
+  const unit = (p: Product) => (p.price === null ? null : p.size ? p.price / p.size.grams : p.price);
+  const groups = new Map<string, Product[]>();
+  for (const p of products) {
+    // Same name and same bag size: bigger bags are normally cheaper per gram, which isn't wholesale.
+    const key = `${p.title.toLowerCase().replace(/\s+/g, " ").trim()}|${p.size?.grams ?? ""}`;
+    groups.set(key, [...(groups.get(key) ?? []), p]);
+  }
+  const drop = new Set<Product>();
+  for (const group of groups.values()) {
+    if (group.length < 2) continue;
+    const top = Math.max(...group.map((p) => unit(p) ?? 0));
+    for (const p of group) {
+      const u = unit(p);
+      if (u !== null && top > 0 && u <= top * 0.8) drop.add(p);
+    }
+  }
+  if (drop.size === 0) return products;
+  // If every twin a vendor name had was the cheap copy, that name is the wholesale
+  // catalogue (Hex files it as "HEX Coffee Roasters", retail as "HEX Coffee"), so its
+  // wholesale-only items with no retail twin (Milkbread) go too.
+  const twinWinners = new Set(
+    [...groups.values()].filter((g) => g.length > 1).flat().filter((p) => !drop.has(p)).map((p) => p.vendor),
+  );
+  const wholesaleVendors = new Set(
+    [...drop].map((p) => p.vendor).filter((v): v is string => typeof v === "string" && v !== "" && !twinWinners.has(v)),
+  );
+  for (const p of products) if (p.vendor && wholesaleVendors.has(p.vendor)) drop.add(p);
+  for (const p of drop) noteSkipped(p.title);
+  return products.filter((p) => !drop.has(p));
+}
+
+const BULK_GRAMS = 900;
+
+/**
+ * Bulk-only products (a 1 kg or 2.5 kg bag with no regular size) from a roaster
+ * that otherwise sells regular bags are almost always for cafés and offices:
+ * Coffee Collective's "Bekele Honey, TIN 4 kg", Prodigal's "Iced Coffee - 2.5
+ * Kilos". Roasters selling mostly in bulk (green coffee) are left alone.
+ */
+export function dropBulkOnly(products: Product[]): Product[] {
+  const sized = products.filter((p) => p.size);
+  const retail = sized.filter((p) => p.size!.grams < BULK_GRAMS).length;
+  if (sized.length === 0 || retail * 2 < sized.length) return products;
+  return products.filter((p) => {
+    // Sold-out items are already hidden; only drop bulk-only ones that would show.
+    if (!p.available || !p.size || p.size.grams < BULK_GRAMS) return true;
+    noteSkipped(p.title);
+    return false;
+  });
+}
+
 function finish(source: FeedSource, siteName: string | null, products: Product[]): RoasterFeed {
   return {
     source,
     siteName,
-    products: dropOtherMarketListings(products.filter(isRealPrice))
+    products: dropBulkOnly(dropWholesaleTwins(dropOtherMarketListings(products.filter(isRealPrice))))
       // Big catalogues are mostly sold-out archives; make sure the cap keeps what's buyable.
       .sort((a, b) => Number(b.available) - Number(a.available))
       .slice(0, MAX_PRODUCTS)
-      .map((p) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
+      // vendor was only needed for the wholesale checks above.
+      .map(({ vendor: _vendor, ...p }) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
   };
 }
 

@@ -62,6 +62,7 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       image: absoluteUrl(p.images?.[0]?.src, origin),
       price: bag.price,
       size: bag.size,
+      vendor: p.vendor || undefined,
       currency,
       available: retailInStock(priced),
       publishedAt: toIso(p.published_at ?? p.created_at),
