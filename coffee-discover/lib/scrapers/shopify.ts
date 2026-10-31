@@ -73,7 +73,8 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       vendor: p.vendor || undefined,
       channel: channelOf(tags, p.product_type),
       currency,
-      available: retailInStock(priced),
+      // "Archived" products linger in the feed with stray stock (Passenger's Bumba).
+      available: retailInStock(priced) && !tags.some((t) => /^archived?$/i.test(t.trim())),
       publishedAt: toIso(p.published_at ?? p.created_at),
       description: summarize(p.body_html),
       searchText: searchTextFor(signals),

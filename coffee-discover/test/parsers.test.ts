@@ -438,3 +438,41 @@ describe("generic crawler", () => {
     expect(products[0]).toMatchObject({ price: 17.36, currency: "EUR", size: { grams: 250, label: "250 g" }, available: true });
   });
 });
+
+describe("hidden underpriced sizes", () => {
+  it("ignores a smaller size that's cheaper per gram than a bigger one (Passenger)", async () => {
+    const { pickBag, retailInStock } = await import("@/lib/scrapers/text");
+    const sizes = [
+      { label: "125 g", price: "6.00", available: true }, { label: "250 g", price: "22.25", available: true },
+      { label: "2 lb", price: "59.50", available: true }, { label: "5 lb", price: "66.50", available: true },
+    ];
+    expect(pickBag(sizes)).toEqual({ price: 22.25, size: { grams: 250, label: "250 g" } });
+    // Only the hidden 125 g in stock: not really buyable.
+    expect(retailInStock([{ label: "125 g", price: "6.75", available: true }, { label: "250 g", price: "26.25", available: false }])).toBe(false);
+  });
+  it("leaves normal pricing alone (smaller bags cost more per gram)", async () => {
+    const { pickBag } = await import("@/lib/scrapers/text");
+    expect(pickBag([{ label: "40g", price: "7.00" }, { label: "250g", price: "28.00" }, { label: "1kg", price: "98.00" }]).price).toBe(28);
+    expect(pickBag([{ label: "10 oz", price: "21.50" }, { label: "2 lb", price: "56.50" }]).price).toBe(21.5);
+  });
+  it("handles other Passenger sizes and equal per-gram pricing", async () => {
+    const { pickBag } = await import("@/lib/scrapers/text");
+    expect(pickBag([{ label: "125 g", price: "11.75" }, { label: "250 g", price: "26.25" }]).price).toBe(26.25);
+    // A rare lot sold in 125 g bags beside a pricier-per-gram nothing: kept.
+    expect(pickBag([{ label: "125 g", price: "35.00" }, { label: "2 lb", price: "159.75" }]).price).toBe(35);
+    expect(pickBag([{ label: "250 g", price: "12.00" }, { label: "1 kg", price: "48.00" }]).price).toBe(12);
+  });
+  it("ignores case packs when choosing the bag (Onyx)", async () => {
+    const { pickBag, retailInStock } = await import("@/lib/scrapers/text");
+    const sizes = [
+      { label: "2oz", price: "6.00" }, { label: "10oz", price: "22.50" }, { label: "2lbs", price: "59.50" },
+      { label: "5lbs", price: "124.00" }, { label: "10oz Case Pack (6)", price: "120.00" }, { label: "5lbs Case Pack (8)", price: "960.00" },
+    ];
+    expect(pickBag(sizes)).toEqual({ price: 22.5, size: { grams: 283, label: "10 oz" } });
+    expect(retailInStock(sizes.map((s) => ({ ...s, available: true })))).toBe(true);
+  });
+  it("treats Archived Shopify products as sold out", () => {
+    const data = { products: [{ ...fx.shopifyProducts.products[0], tags: ["Archived", "Reserve Lot"] }] };
+    expect(parseShopify(data, "https://r.example")[0].available).toBe(false);
+  });
+});

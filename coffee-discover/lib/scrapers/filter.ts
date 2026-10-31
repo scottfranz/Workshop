@@ -43,7 +43,7 @@ const NON_COFFEE_TITLE = [
   "mug", "mugs", "tumbler", "tumblers", "glass", "glasses", "cups", "shirt", "shirts", "tee", "tees", "t-shirt", "t-shirts",
   "hoodie", "hoodies", "sweatshirt", "sweatshirts", "crewneck", "hat", "hats", "beanie", "beanies", "cap", "caps", "tote",
   "totes", "sticker", "stickers", "poster", "posters", "print", "prints", "pin", "pins", "patch", "patches", "keychain",
-  "postcard", "postcards", "socks", "apron", "aprons", "candle", "candles",
+  "postcard", "postcards", "info card", "info cards", "card set", "socks", "apron", "aprons", "candle", "candles",
   // reading
   "book", "books", "atlas", "handbook", "magazine", "zine",
   // other drinks and food
