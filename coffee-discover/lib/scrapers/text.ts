@@ -51,10 +51,9 @@ export function toNumber(v: unknown): number | null {
 export function isSampleSize(label: string | null | undefined): boolean {
   if (!label) return false;
   if (/\bsample|\btaster|\btrial size/i.test(label)) return true;
-  const g = label.match(/(\d+(?:\.\d+)?)\s?(g|gr|grams?)\b/i);
-  if (g) return parseFloat(g[1]) < 100;
-  const oz = label.match(/(\d+(?:\.\d+)?)\s?(oz|ounces?)\b/i);
-  return oz ? parseFloat(oz[1]) < 3 : false;
+  // Under 100 g, or under 3 oz, using the same size reader as everything else.
+  const size = parseBagSize(label);
+  return size ? size.grams < (size.label.endsWith("oz") ? 85 : 100) : false;
 }
 
 export function minPrice(values: unknown[]): number | null {
@@ -101,7 +100,8 @@ export interface BagSize {
 }
 
 const UNIT_GRAMS: Record<string, [number, string]> = {
-  g: [1, "g"], gr: [1, "g"], gram: [1, "g"], grams: [1, "g"], kg: [1000, "kg"], kilo: [1000, "kg"], kilos: [1000, "kg"],
+  g: [1, "g"], gr: [1, "g"], gram: [1, "g"], grams: [1, "g"], gm: [1, "g"], gms: [1, "g"], grm: [1, "g"], grms: [1, "g"],
+  kg: [1000, "kg"], kgs: [1000, "kg"], kilo: [1000, "kg"], kilos: [1000, "kg"],
   oz: [28.3495, "oz"], ounce: [28.3495, "oz"], ounces: [28.3495, "oz"],
   lb: [453.592, "lb"], lbs: [453.592, "lb"], pound: [453.592, "lb"], pounds: [453.592, "lb"],
 };
@@ -109,7 +109,8 @@ const UNIT_GRAMS: Record<string, [number, string]> = {
 /** "12oz", "250 g", "2lbs", "1kg / Whole Bean" → bag size, or null if there isn't one. */
 export function parseBagSize(text: string | null | undefined): BagSize | null {
   if (!text) return null;
-  const m = text.match(/(\d+(?:[.,]\d+)?)\s*(kilos?|kg|grams?|gr|g|ounces?|oz|pounds?|lbs?)(?![a-z])/i);
+  // "250gms" (Proud Mary), "250 g", "12oz", "1KGs"...
+  const m = text.match(/(\d+(?:[.,]\d+)?)\s*(kilos?|kgs?|grams?|grms?|grm|gms?|gr|g|ounces?|oz|pounds?|lbs?)(?![a-z])/i);
   if (!m) return null;
   const n = parseFloat(m[1].replace(",", "."));
   const [factor, unit] = UNIT_GRAMS[m[2].toLowerCase()];

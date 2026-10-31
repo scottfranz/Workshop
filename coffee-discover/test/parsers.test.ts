@@ -285,6 +285,7 @@ describe("bag size", () => {
   it.each([
     ["250g", 250, "250 g"], ["12oz", 340, "12 oz"], ["2lbs", 907, "2 lb"], ["1kg / Whole Bean", 1000, "1 kg"],
     ["200G", 200, "200 g"], ["8oz / Decaf", 227, "8 oz"], ["2.5kg", 2500, "2.5 kg"], ["10 ounces", 283, "10 oz"],
+    ["250gms / Whole Bean", 250, "250 g"], ["500gm", 500, "500 g"], ["1kgs", 1000, "1 kg"], ["250 grms", 250, "250 g"],
   ])("%s → %ig", async (label, grams, nice) => {
     const { parseBagSize } = await import("@/lib/scrapers/text");
     expect(parseBagSize(label)).toEqual({ grams, label: nice });
