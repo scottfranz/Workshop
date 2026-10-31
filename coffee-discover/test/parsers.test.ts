@@ -401,3 +401,40 @@ describe("labelled sales channels", () => {
     expect(dropWholesaleChannel(list)).toBe(list);
   });
 });
+
+describe("roast twins", () => {
+  const p = (id: string, title: string, url: string) => ({ id, title, url, image: null, price: 16, currency: "EUR", available: true, publishedAt: null, description: null });
+  it("adds Espresso / Filter from the address when names collide", async () => {
+    const { labelRoastTwins } = await import("@/lib/scrapers");
+    const out = labelRoastTwins([
+      p("a", "Colombia - Chapata", "https://fathers.cz/en/coffee/espresso/colombia-chapata-espresso"),
+      p("b", "Colombia – Chapata", "https://fathers.cz/en/coffee/filter/colombia-chapata"),
+      p("c", "Kenya - Karatina AB", "https://fathers.cz/en/coffee/filter/karatina"),
+    ]);
+    expect(out.map((x) => x.title)).toEqual(["Colombia - Chapata (Espresso)", "Colombia – Chapata (Filter)", "Kenya - Karatina AB"]);
+  });
+});
+
+describe("generic crawler", () => {
+  it("follows /coffee/<category>/<name> product links and skips blog posts", async () => {
+    const { productLinksFromHtml, listingLinks } = await import("@/lib/scrapers/jsonld");
+    const html = `<a href="/en/coffee">All</a><a href="/en/coffee/espresso">Espresso</a><a href="/en/coffee/espresso/ethiopia-chelbesa">x</a>
+      <a href="/en/blog/a-new-home-for-coffee">blog</a><a href="/en/coffee-subscription">sub</a><a href="https://other.example/coffee/a/b">ext</a>`;
+    expect(productLinksFromHtml(html, "https://fathers.example/en")).toEqual([
+      "https://fathers.example/en/coffee/espresso", "https://fathers.example/en/coffee/espresso/ethiopia-chelbesa",
+    ]);
+    expect(listingLinks(html, "https://fathers.example/en")).toEqual(["https://fathers.example/en/coffee"]);
+  });
+
+  it("prices a ProductGroup from its in-stock retail size", async () => {
+    const html = `<script type="application/ld+json">${JSON.stringify({
+      "@type": "ProductGroup", name: "Ethiopia - Chelbesa", url: "https://fathers.example/en/coffee/espresso/chelbesa", description: "Washed.",
+      hasVariant: [
+        { "@type": "Product", name: "Ethiopia - Chelbesa", weight: { value: 250, unitCode: "GRM" }, offers: { price: 17.36, priceCurrency: "EUR", availability: "https://schema.org/InStock" } },
+        { "@type": "Product", name: "Ethiopia - Chelbesa", weight: { value: 1000, unitCode: "GRM" }, offers: { price: 60.38, priceCurrency: "EUR", availability: "https://schema.org/InStock" } },
+        { "@type": "Product", name: "Ethiopia - Chelbesa", weight: { value: 2000, unitCode: "GRM" }, offers: { price: 120.76, priceCurrency: "EUR", availability: "https://schema.org/OutOfStock" } },
+      ] })}</script>`;
+    const { products } = productsFromHtml(html, "https://fathers.example/en/coffee/espresso/chelbesa");
+    expect(products[0]).toMatchObject({ price: 17.36, currency: "EUR", size: { grams: 250, label: "250 g" }, available: true });
+  });
+});
