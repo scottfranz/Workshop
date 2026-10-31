@@ -39,8 +39,14 @@ export function cleanPastedUrl(text: string): string {
     u = inner;
   }
   u.hash = "";
-  for (const key of [...u.searchParams.keys()]) if (TRACKING.test(key)) u.searchParams.delete(key);
   // Trailing punctuation from a sentence ("...roaster.com/shop.").
   u.pathname = u.pathname.replace(/[.,;:!?)]+$/, "");
+  // A homepage never needs a query; anything there is tracking (Luna's "?_su_rec=...").
+  if (u.pathname === "/") u.search = "";
+  // Elsewhere keep what a shop may need ("?product_cat=coffee"), but not known trackers,
+  // "_"-prefixed codes (Shopify apps' _pos, _sid, _su_rec...) or long tokens.
+  for (const [key, value] of [...u.searchParams.entries()]) {
+    if (TRACKING.test(key) || key.startsWith("_") || value.length > 64) u.searchParams.delete(key);
+  }
   return u.toString().replace(/\/$/, "").replace(/\/\?/, "?");
 }
