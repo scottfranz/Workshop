@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { ISSUES_URL, SITE_NAME } from "@/lib/site";
+import { REPORT_PATH, SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = { title: "How it works & privacy" };
 
@@ -51,8 +51,8 @@ export default function About() {
         <h2>Something not working?</h2>
         <p>
           If a roaster won&apos;t load, shows the wrong prices, or includes things that aren&apos;t coffee,{" "}
-          <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer">report it here</a>. Include the roaster&apos;s web address.
-          Reports are public and need a free GitHub account.
+          <Link href={REPORT_PATH}>report it here</Link>. Reports go privately to the person who runs {SITE_NAME}; only what you
+          type is sent, and an email address is only needed if you&apos;d like a reply.
         </p>
       </article>
     </main>

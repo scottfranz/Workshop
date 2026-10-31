@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { reportLink } from "@/lib/site";
 
 export function AddRoasterForm({ onAdd, autoFocus, compact }: {
   onAdd: (url: string, name?: string) => Promise<void>;
@@ -37,7 +38,7 @@ export function AddRoasterForm({ onAdd, autoFocus, compact }: {
             placeholder="Paste a roaster's website or shop page" value={url} onChange={(e) => setUrl(e.target.value)} autoFocus={autoFocus} />
           <button className="btn btn-primary" disabled={busy || !url.trim()}>{busy ? "Looking…" : "Follow"}</button>
         </div>
-        <div aria-live="polite">{error && <p className="error" style={{ marginTop: 10 }}>{error}</p>}</div>
+        <div aria-live="polite">{error && <p className="error" style={{ marginTop: 10 }}>{error} <a href={reportLink(url)}>Report this roaster</a></p>}</div>
       </form>
     );
   }
@@ -57,7 +58,7 @@ export function AddRoasterForm({ onAdd, autoFocus, compact }: {
         <label htmlFor="roaster-name">Name <span className="muted">(optional)</span></label>
         <input id="roaster-name" className="input" type="text" placeholder="We'll use the store's name" value={name} onChange={(e) => setName(e.target.value)} />
       </div>
-      <div aria-live="polite">{error && <p className="error">{error}</p>}</div>
+      <div aria-live="polite">{error && <p className="error">{error} <a href={reportLink(url)}>Report this roaster</a></p>}</div>
       <button className="btn btn-primary" disabled={busy || !url.trim()}>{busy ? "Looking for coffees…" : "Follow roaster"}</button>
     </form>
   );
