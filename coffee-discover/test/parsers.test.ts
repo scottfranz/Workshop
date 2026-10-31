@@ -386,3 +386,18 @@ describe("wholesale twins", () => {
     expect(dropWholesaleTwins(sizes)).toBe(sizes);
   });
 });
+
+describe("labelled sales channels", () => {
+  const p = (id: string, channel?: "retail" | "wholesale") => ({
+    id, title: id, url: id, image: null, price: 20, currency: "USD", available: true, publishedAt: null, description: null, channel,
+  });
+  it("drops wholesale listings when the store also labels retail ones (Blendin)", async () => {
+    const { dropWholesaleChannel } = await import("@/lib/scrapers");
+    expect(dropWholesaleChannel([p("r", "retail"), p("w", "wholesale"), p("haro-wachu", "wholesale"), p("collab")]).map((x) => x.id)).toEqual(["r", "collab"]);
+  });
+  it("ignores a wholesale label when nothing is labelled retail (Sweet Bloom)", async () => {
+    const { dropWholesaleChannel } = await import("@/lib/scrapers");
+    const list = [p("a", "wholesale"), p("b", "wholesale")];
+    expect(dropWholesaleChannel(list)).toBe(list);
+  });
+});

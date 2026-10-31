@@ -25,6 +25,14 @@ export function shopifyProductsEndpoint(feedUrl: string): string {
   return `${u.origin}${collection ? collection[0] : ""}/products.json`;
 }
 
+/** "retail" / "wholesale" when the store labels the product's sales channel itself. */
+function channelOf(tags: string[], productType?: string): "retail" | "wholesale" | undefined {
+  const labels = [...tags, productType ?? ""].map((t) => t.toLowerCase().trim());
+  if (labels.some((t) => /\b(wholesale|b2b)\b/.test(t))) return "wholesale";
+  if (labels.some((t) => t === "retail")) return "retail";
+  return undefined;
+}
+
 /**
  * @param listed handles in the store's sitemap. Shops keep wholesale, café-only,
  *   partner and other private products out of it, but also hide some public
@@ -63,6 +71,7 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       price: bag.price,
       size: bag.size,
       vendor: p.vendor || undefined,
+      channel: channelOf(tags, p.product_type),
       currency,
       available: retailInStock(priced),
       publishedAt: toIso(p.published_at ?? p.created_at),

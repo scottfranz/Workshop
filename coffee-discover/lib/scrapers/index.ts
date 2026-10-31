@@ -63,6 +63,20 @@ async function hasShopifyFeed(url: string): Promise<boolean> {
 }
 
 /**
+ * Stores that label both channels ("retail" on some products, "wholesale" on
+ * others, like Blendin) mean it: drop the wholesale side. A "wholesale" tag
+ * alone isn't enough (Sweet Bloom tags retail bags that way too).
+ */
+export function dropWholesaleChannel(products: Product[]): Product[] {
+  if (!products.some((p) => p.channel === "retail") || !products.some((p) => p.channel === "wholesale")) return products;
+  return products.filter((p) => {
+    if (p.channel !== "wholesale") return true;
+    noteSkipped(p.title);
+    return false;
+  });
+}
+
+/**
  * Some roasters list each product twice: retail, and a wholesale copy with the
  * same name at a wholesale price (Hex: "Gachatha • Washed" at $26 and $14.75,
  * often with no wholesale tag at all). Wholesale is typically 30-45% off, so
@@ -125,12 +139,12 @@ function finish(source: FeedSource, siteName: string | null, products: Product[]
   return {
     source,
     siteName,
-    products: dropBulkOnly(dropWholesaleTwins(dropOtherMarketListings(products.filter(isRealPrice))))
+    products: dropBulkOnly(dropWholesaleTwins(dropWholesaleChannel(dropOtherMarketListings(products.filter(isRealPrice)))))
       // Big catalogues are mostly sold-out archives; make sure the cap keeps what's buyable.
       .sort((a, b) => Number(b.available) - Number(a.available))
       .slice(0, MAX_PRODUCTS)
       // vendor was only needed for the wholesale checks above.
-      .map(({ vendor: _vendor, ...p }) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
+      .map(({ vendor: _vendor, channel: _channel, ...p }) => ({ ...p, title: preferLatin(p.title), description: preferLatin(p.description) })),
   };
 }
 

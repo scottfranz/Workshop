@@ -31,6 +31,8 @@ export interface Product {
   description: string | null;
   /** Brand the store files the product under (Shopify "vendor"); used server-side only. */
   vendor?: string;
+  /** Which sales channel the store's own tags/category say this is for; used server-side only. */
+  channel?: "retail" | "wholesale";
   /** Extra text search matches against: fuller description, category, tags, sizes, origin/process/variety words. */
   searchText?: string;
 }
