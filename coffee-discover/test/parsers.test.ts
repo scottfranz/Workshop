@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseBigCartel } from "@/lib/scrapers/bigcartel";
 import { looksLikeCoffee } from "@/lib/scrapers/filter";
 import { productLinksFromHtml, productsFromHtml, siteNameFromHtml } from "@/lib/scrapers/jsonld";
-import { parseShopify, shopifyProductsEndpoint } from "@/lib/scrapers/shopify";
+import { isPrivateLabel, parseShopify, shopifyProductsEndpoint } from "@/lib/scrapers/shopify";
 import { isSquarespaceProductPage, parseSquarespace } from "@/lib/scrapers/squarespace";
 import { parseWooCommerce, wooCategoryFromUrl } from "@/lib/scrapers/woocommerce";
 import * as fx from "./fixtures";
@@ -526,5 +526,23 @@ describe("Hydrogen storefronts (sizes the site actually offers)", () => {
     const res = (body: string) => ({ url: "https://r.example/", status: 200, contentType: "text/html", body });
     expect(isHydrogenHome(res(page))).toBe(true);
     expect(isHydrogenHome(res("<html>cdn.shopify.com</html>"))).toBe(false);
+  });
+});
+
+describe("private-label wholesale coffees", () => {
+  it("drops coffees roasted for a named wholesale customer (H&S for Java Moon)", () => {
+    expect(isPrivateLabel(["b2b-java-moon"], "Java Moon Bighorn Medium")).toBe(true);
+    expect(isPrivateLabel(["Wholesale: Café Olé"], "Cafe Ole House Blend")).toBe(true);
+    const data = { products: [
+      { id: 1, handle: "java-moon-bighorn-medium", title: "Java Moon Bighorn Medium", product_type: "Coffee", tags: ["b2b-java-moon"], variants: [{ title: "250g (8.8oz)", price: "11.00", available: true }] },
+      { id: 2, handle: "downtown-blend", title: "Downtown Blend", product_type: "Coffee", tags: ["blend", "coffee"], variants: [{ title: "250g (8.8oz)", price: "21.00", available: true }] },
+    ] };
+    expect(parseShopify(data, "https://r.example").map((p) => p.title)).toEqual(["Downtown Blend"]);
+  });
+  it("keeps coffees with generic wholesale tags", () => {
+    expect(isPrivateLabel(["wholesale-coffee"], "Bedessa")).toBe(false);
+    expect(isPrivateLabel(["wholesale-coffee"], "Holiday Coffee")).toBe(false);
+    expect(isPrivateLabel(["b2b"], "Java Moon Bighorn Medium")).toBe(false);
+    expect(isPrivateLabel(["b2b-java-moon"], "Ethiopia Guji")).toBe(false);
   });
 });
