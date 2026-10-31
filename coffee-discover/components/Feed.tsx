@@ -69,6 +69,13 @@ export function Feed() {
   const [linkPreview, setLinkPreview] = useState<{ incoming: SharedRoaster[]; alreadyNames: string[] } | null>(null);
   const [linkImport, setLinkImport] = useState<LinkImport | null>(null);
   const [lastHidden, setLastHidden] = useState<string | null>(null);
+  const [dismissedErrors, setDismissedErrors] = useState<Set<string>>(new Set());
+  // "Hidden. Undo" only needs to linger long enough to change your mind.
+  useEffect(() => {
+    if (!lastHidden) return;
+    const t = setTimeout(() => setLastHidden(null), 8000);
+    return () => clearTimeout(t);
+  }, [lastHidden]);
   const [chipsOpen, setChipsOpen] = useState(false);
   const [shareNote, setShareNote] = useState<string | null>(null);
   const [rates, setRates] = useState<Rates | null>(null);
@@ -322,6 +329,7 @@ export function Feed() {
   const sinceLastVisit = allItems.filter((i) => i.sinceLastVisit && i.available && !hidden.has(i.key)).length;
   const anyLoading = Object.values(status).some((s) => s.state === "loading");
   const errors = state.roasters.filter((r) => status[r.id]?.state === "error");
+  const visibleErrors = errors.filter((r) => !dismissedErrors.has(r.id));
   const firstLoad = anyLoading && allItems.length === 0;
 
   // ── Render ────────────────────────────────────────────────────────────────
@@ -431,6 +439,9 @@ export function Feed() {
             {sinceLastVisit > 0 && (
               <div className="banner" role="status">
                 <span><strong>{sinceLastVisit} new coffee{sinceLastVisit === 1 ? "" : "s"}</strong> since your last visit.</span>
+                {/* Dismissing counts as having seen them: the banner returns only for later arrivals. */}
+                <button type="button" className="dismiss" aria-label="Dismiss" title="Dismiss"
+                  onClick={() => setState((s) => ({ ...s, prevVisit: Date.now() }))}>×</button>
               </div>
             )}
 
@@ -441,13 +452,16 @@ export function Feed() {
                   setState((s) => ({ ...s, hidden: s.hidden.filter((k) => k !== lastHidden) }));
                   setLastHidden(null);
                 }}>Undo</button>
+                <button type="button" className="dismiss" aria-label="Dismiss" title="Dismiss" onClick={() => setLastHidden(null)}>×</button>
               </p>
             )}
 
-            {errors.length > 0 && !anyLoading && (
+            {visibleErrors.length > 0 && !anyLoading && (
               <p className="notice">
-                Couldn&apos;t update {errors.map((r) => r.name).join(", ")}. Showing what we had before.{" "}
+                Couldn&apos;t update {visibleErrors.map((r) => r.name).join(", ")}. Showing what we had before.{" "}
                 <button type="button" className="btn btn-ghost" style={{ minHeight: 28 }} onClick={() => setDialog("manage")}>Details</button>
+                <button type="button" className="dismiss" aria-label="Dismiss" title="Dismiss"
+                  onClick={() => setDismissedErrors(new Set(errors.map((r) => r.id)))}>×</button>
               </p>
             )}
 
