@@ -8,6 +8,12 @@ describe("cleaning pasted roaster addresses", () => {
     expect(cleanPastedUrl("https://onyxcoffeelab.com/collections/coffee?srsltid=AfmBOoq123&gad_source=1")).toBe("https://onyxcoffeelab.com/collections/coffee");
     expect(cleanPastedUrl("https://drinkpassenger.com/products/agaro?_pos=1&_sid=abc&_ss=r#reviews")).toBe("https://drinkpassenger.com/products/agaro");
   });
+  it("drops unknown tracking codes (a Shopify app's _su_rec on Luna's link)", () => {
+    const long = "aXOqOE94SJFayJv0n8pEdb5EZYBRn_bD9y9Ua3-kx3_3t94DD7iSbhx1OG-4He5i9nyusuPTMiybF1hWlVgOQc10xBC6L2a54gQ";
+    expect(cleanPastedUrl(`https://enjoylunacoffee.com/?_su_rec=${long}&_su_rec_id=88ad48e9-c58e-4a18-93b4-0c8630dc633d-1793410100`)).toBe("https://enjoylunacoffee.com");
+    expect(cleanPastedUrl(`https://r.example/collections/coffee?_su_rec=${long}&foo=1`)).toBe("https://r.example/collections/coffee?foo=1");
+    expect(cleanPastedUrl(`https://r.example/shop?token=${long}`)).toBe("https://r.example/shop");
+  });
   it("keeps parameters a shop needs", () => {
     expect(cleanPastedUrl("https://shop.example/shop?product_cat=coffee&utm_source=x")).toBe("https://shop.example/shop?product_cat=coffee");
   });
