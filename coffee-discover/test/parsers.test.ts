@@ -366,6 +366,12 @@ describe("wholesale twins", () => {
     expect(out.map((x) => x.id)).toEqual(["r", "solo"]);
   });
 
+  it("only compares prices in the same currency (Father's mixes CZK and EUR pages)", async () => {
+    const { dropWholesaleTwins } = await import("@/lib/scrapers");
+    const out = dropWholesaleTwins([{ ...p("esp", "Ethiopia - Chelbesa", 424.77, 250), currency: "CZK" }, { ...p("fil", "Ethiopia - Chelbesa", 17.36, 250), currency: "EUR" }]);
+    expect(out.map((x) => x.id)).toEqual(["esp", "fil"]);
+  });
+
   it("drops the rest of a wholesale-only vendor's catalogue too", async () => {
     const { dropWholesaleTwins } = await import("@/lib/scrapers");
     const v = (x: ReturnType<typeof p>, vendor: string) => ({ ...x, vendor });

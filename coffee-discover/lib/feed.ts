@@ -50,12 +50,13 @@ export function buildItems(
     const firstSeen = seen[p.id] ?? now;
     const published = p.publishedAt ? Date.parse(p.publishedAt) : NaN;
     const arrivedAfterFollow = firstSeen > baseline;
-    const recentlyPublished = Number.isFinite(published) && now - published < NEW_WINDOW_MS;
+    const dated = Number.isFinite(published);
+    // The store's own date wins: a product first seen late (a filter change let it in,
+    // Monogram's April expo tasters) didn't arrive then.
     // Undated products already in the shop when it was followed (Wix, WooCommerce)
-    // didn't just arrive: sort them after dated ones, except those the shop labels new.
-    const arrivedAt = Number.isFinite(published) ? Math.max(published, arrivedAfterFollow ? firstSeen : 0)
-      : arrivedAfterFollow ? firstSeen : p.markedNew ? roaster.addedAt : 0;
-    const isNew = recentlyPublished || (arrivedAfterFollow && now - firstSeen < NEW_WINDOW_MS);
+    // didn't just arrive either: sort them after dated ones, except those the shop labels new.
+    const arrivedAt = dated ? published : arrivedAfterFollow ? firstSeen : p.markedNew ? roaster.addedAt : 0;
+    const isNew = dated ? now - published < NEW_WINDOW_MS : arrivedAfterFollow && now - firstSeen < NEW_WINDOW_MS;
     return {
       ...p,
       // Fill in the visitor's "usual bag size" for this roaster when the store doesn't say,
@@ -66,7 +67,7 @@ export function buildItems(
       key: `${roaster.id}::${p.id}`,
       firstSeen,
       isNew,
-      sinceLastVisit: previousVisit !== null && isNew && (arrivedAfterFollow ? firstSeen > previousVisit : published > previousVisit),
+      sinceLastVisit: previousVisit !== null && isNew && (dated ? published > previousVisit : firstSeen > previousVisit),
       arrivedAt,
     };
   });
