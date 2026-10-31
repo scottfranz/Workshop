@@ -60,7 +60,7 @@ export function isStorefrontHtml(html: string): boolean {
 }
 
 /** The JSON object starting at `start` (a "{"), respecting strings and nesting. */
-function objectAt(text: string, start: number): string | null {
+export function objectAt(text: string, start: number): string | null {
   let depth = 0;
   let inString = false;
   for (let i = start; i < text.length; i++) {

@@ -46,7 +46,8 @@ const NON_COFFEE_TITLE = [
   // reading
   "book", "books", "atlas", "handbook", "magazine", "zine",
   // other drinks and food
-  "capsule", "capsules", "pods", "nespresso", "cometeer", "rtd", "ready to drink", "concentrate", "syrup", "tea", "chai",
+  "beer", "ipa", "bock", "lager", "mocktail", "mocktails", "kombucha", "soda", "oatside", "oat milk", "milk", "cans",
+  "local only", "pickup only", "pick-up only", "in-store only", "capsule", "capsules", "pods", "nespresso", "cometeer", "rtd", "ready to drink", "concentrate", "syrup", "tea", "chai",
   "matcha", "cocoa", "chocolate bar", "chocolate covered", "chocolate collection", "sipping chocolate", "drinking chocolate",
   "hot chocolate", "powder", "toddy", "instant", "sample only",
 ];
