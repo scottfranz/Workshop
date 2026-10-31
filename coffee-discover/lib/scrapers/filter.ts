@@ -56,7 +56,8 @@ const NON_COFFEE_TITLE = [
 const NON_COFFEE_TYPE = [
   "matériel", "accessoire", "vaisselle", "zubehör", "udstyr", "utrustning",
   "merch", "apparel", "equipment", "gear", "accessor", "tool", "brewer", "brewing", "ware", "book", "water", "gift",
-  "subscription", "tea", "kitchen", "supplies", "cleaning", "service", "class", "drink", "grinder", "machine",
+  "subscription", "tea", "kitchen", "supplies", "cleaning", "service", "class", "workshop", "course", "event", "ticket",
+  "experience", "drink", "grinder", "machine",
   "dripper", "kettle", "scale", "music", "vinyl", "record", "rtd", "capsule", "cometeer", "chocolate", "cacao",
 ];
 
@@ -145,10 +146,14 @@ export function coffeeVerdict(input: ProductSignals | string): CoffeeVerdict {
   if (anyPhrase(titleForBlocklist, NON_COFFEE_TITLE) || hasPhrase(titleForBlocklist, "cup")) return "not";
   // Compound words (Norwegian/Danish/Swedish/German) hide these inside longer words: "kaffeabonnement".
   if (/abonnement|abonnemang|gavekort|presentkort|gutschein/.test(title)) return "not";
+  // Subscriptions named by their schedule: Calendar's "Gift - 6 Months - Espresso - Every 2 Weeks".
+  if (/\bprepaid\b|\bevery\s+(\d+\s+)?(weeks?|months?)\b|\bgift\b.*\b\d+\s*months?\b/.test(title)) return "not";
   // A gear word in the category wins, so "Coffee Equipment" or "Coffee Grinders" isn't coffee.
   if (type !== "" && NON_COFFEE_TYPE.some((w) => type.includes(w))) return "not";
   const typeSaysCoffee = type !== "" && anyPhrase(type, COFFEE_TYPE);
   if (/(^|\|\s*)(merch|merchandise|gear|equipment|accessories|apparel|books?|water|tools?|brew gear)(\s*\||$)/.test(tags)) return "not";
+  // Classes and events ("Coffee Cupping with Subtext", tagged "classes and experience").
+  if (/(^|\|\s*)[^|]*\b(class(es)?|workshops?|courses?|events?|tickets?)\b[^|]*(\s*\||$)/.test(tags)) return "not";
   // Tags or vendor marking wholesale, café-only, partner or hidden products.
   // Tags marking café-only, partner or hidden products. ("wholesale" alone isn't enough:
   // many roasters tag retail coffees that way so they also appear in a wholesale portal.)

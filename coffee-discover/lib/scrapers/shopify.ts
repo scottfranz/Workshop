@@ -35,6 +35,23 @@ function channelOf(tags: string[], productType?: string): "retail" | "wholesale"
 }
 
 /**
+ * A coffee roasted for one wholesale customer: a "b2b-" / "wholesale-" tag naming
+ * a business that's also in the title (H&S's "Java Moon Bighorn Medium", tagged
+ * "b2b-java-moon"). Generic tags like Sweet Bloom's "wholesale-coffee", used on
+ * retail bags too, name no one.
+ */
+export function isPrivateLabel(tags: string[], title: string): boolean {
+  const words = (s: string) => s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").split(/[^a-z0-9]+/).filter(Boolean);
+  const titleText = ` ${words(title).join(" ")} `;
+  return tags.some((tag) => {
+    const name = tag.toLowerCase().match(/^(?:b2b|wholesale)[\s_:-]+(.+)$/)?.[1];
+    if (!name) return false;
+    const parts = words(name).filter((w) => !/^(coffee|coffees|only|product|products|account|accounts|customer|customers|price|pricing|list|bulk|item|items)$/.test(w));
+    return parts.length > 0 && titleText.includes(` ${parts.join(" ")} `);
+  });
+}
+
+/**
  * @param listed handles in the store's sitemap. Shops keep wholesale, café-only,
  *   partner and other private products out of it, but also hide some public
  *   coffees from search engines (Regalia's Vinka lots), and new products can be
@@ -62,6 +79,15 @@ export function parseShopify(
     ].filter((o) => o && o !== "Title" && o !== "Default Title");
     const signals = { title, productType: p.product_type, tags, vendor: p.vendor, description: stripHtml(p.body_html), options };
     if (!keepCoffee(signals)) continue;
+    // $0.00 everywhere: not on sale yet, or priced by a bundle app we can't see.
+    if (variants.length && variants.every((v) => !(parseFloat(v.price ?? "") > 0))) {
+      noteSkipped(title);
+      continue;
+    }
+    if (isPrivateLabel(tags, title)) {
+      noteSkipped(title);
+      continue;
+    }
     if (listed && !listed.has(p.handle) && !titleSaysCoffee(title)) {
       noteSkipped(title);
       continue;

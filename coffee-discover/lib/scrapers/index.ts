@@ -1,3 +1,4 @@
+import { cleanPastedUrl } from "@/lib/url";
 import { fetchBigCartel, isBigCartelList, parseBigCartel } from "./bigcartel";
 import { collectSkipped, noteSkipped } from "./filter";
 import { fetchJsonLd } from "./jsonld";
@@ -19,12 +20,8 @@ const MAX_PRODUCTS = 300;
 export const PLATFORMS: Platform[] = ["shopify", "storefront", "woocommerce", "squarespace", "square", "subbly", "wix", "bigcartel", "jsonld"];
 
 export function normalizeUrl(raw: string): string {
-  let s = raw.trim();
-  if (!/^https?:\/\//i.test(s)) s = "https://" + s;
-  const u = new URL(s);
-  u.hash = "";
-  // Tracking params would fragment the CDN cache for no benefit.
-  for (const key of [...u.searchParams.keys()]) if (/^(utm_|fbclid|gclid|ref$)/i.test(key)) u.searchParams.delete(key);
+  // Tracking params would also fragment the CDN cache for no benefit.
+  const u = new URL(cleanPastedUrl(raw).replace(/^(?!https?:\/\/)/i, "https://"));
   if (u.pathname !== "/" && u.pathname.endsWith("/")) u.pathname = u.pathname.replace(/\/+$/, "");
   return u.toString().replace(/\/$/, "");
 }
