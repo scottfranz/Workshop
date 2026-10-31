@@ -24,6 +24,17 @@ describe("new-arrival logic", () => {
     expect(items[0].isNew).toBe(true);
   });
 
+  it("sorts an undated catalogue after dated coffees, except what the shop labels new", () => {
+    const justFollowed = { ...roaster, addedAt: NOW - DAY };
+    const atFollow = { old: justFollowed.addedAt, labelled: justFollowed.addedAt, later: NOW - 60_000 };
+    const items = [
+      ...buildItems(justFollowed, [product("old"), product("labelled", { markedNew: true }), product("later")], atFollow, null, NOW),
+      ...buildItems({ ...roaster, id: "d" }, [product("dated", { publishedAt: new Date(NOW - 40 * DAY).toISOString() })], { dated: roaster.addedAt }, null, NOW),
+    ];
+    expect(filterAndSort(items, DEFAULT_PREFS, { roasterId: null, query: "", hidden: new Set() }).map((i) => i.id))
+      .toEqual(["later", "labelled", "dated", "old"]);
+  });
+
   it("stops calling things new after two weeks", () => {
     const items = buildItems(roaster, [product("x")], { x: NOW - 20 * DAY }, null, NOW);
     expect(items[0].isNew).toBe(false);
