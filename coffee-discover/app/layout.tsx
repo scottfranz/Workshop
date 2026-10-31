@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import Link from "next/link";
-import { SITE_NAME, SITE_TAGLINE } from "@/lib/site";
+import { ISSUES_URL, SITE_NAME, SITE_TAGLINE } from "@/lib/site";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -29,7 +29,10 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <footer className="site-footer">
           <div className="wrap">
             <span>{SITE_NAME} · No accounts. No cookies. No tracking.</span>
-            <Link href="/about">How it works &amp; privacy</Link>
+            <span className="footer-links">
+              <Link href="/about">How it works &amp; privacy</Link>
+              <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer">Report a problem</a>
+            </span>
           </div>
         </footer>
       </body>

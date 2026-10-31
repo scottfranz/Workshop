@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { SITE_NAME } from "@/lib/site";
+import { ISSUES_URL, SITE_NAME } from "@/lib/site";
 
 export const metadata: Metadata = { title: "How it works & privacy" };
 
@@ -11,8 +11,8 @@ export default function About() {
         <p><Link href="/">← Back to your feed</Link></p>
         <h1>How {SITE_NAME} works</h1>
         <p>
-          Follow the roasters you like and {SITE_NAME} checks their online shops for coffees. When a new bag shows up, it&apos;s
-          marked <strong>New</strong> and floats to the top of your feed.
+          Follow the roasters you like and {SITE_NAME} checks their online shops for the coffees they have in stock, newest first,
+          with each bag&apos;s size and price per cup. Gear, merch, gift cards and subscriptions are left out automatically.
         </p>
 
         <h2>What we store, and where</h2>
@@ -42,15 +42,17 @@ export default function About() {
 
         <h2>Which shops work</h2>
         <ul>
-          <li><strong>Shopify</strong>, <strong>WooCommerce</strong>, <strong>Squarespace</strong>, <strong>Square Online</strong> and <strong>Big Cartel</strong> shops are read from their built-in product feeds.</li>
+          <li><strong>Shopify</strong>, <strong>WooCommerce</strong>, <strong>Squarespace</strong>, <strong>Square Online</strong> and <strong>Big Cartel</strong> shops are read from their built-in product feeds, including custom-built Shopify sites.</li>
           <li>Other shops work if they publish product details for search engines (most do). We read those from the page you give us and up to 24 product pages linked from it.</li>
           <li>If a homepage doesn&apos;t work, try the link to the roaster&apos;s coffee page. A specific collection link narrows your feed to just that collection.</li>
+          <li>Some roasters&apos; websites block automated readers like {SITE_NAME}. We respect that, so those roasters can&apos;t be followed.</li>
         </ul>
 
-        <h2>How &ldquo;new&rdquo; is decided</h2>
+        <h2>Something not working?</h2>
         <p>
-          A coffee is new if the shop says it was published in the last two weeks, or if it appeared after you started following that roaster.
-          Gear, merch, gift cards and subscriptions are filtered out automatically.
+          If a roaster won&apos;t load, shows the wrong prices, or includes things that aren&apos;t coffee,{" "}
+          <a href={ISSUES_URL} target="_blank" rel="noopener noreferrer">report it here</a>. Include the roaster&apos;s web address.
+          Reports are public and need a free GitHub account.
         </p>
       </article>
     </main>

@@ -101,6 +101,28 @@ describe("detectFeed", () => {
     expect(feed.products.map((p) => p.title)).toEqual(["Ethiopia Guji Hambela", "Colombia Decaf"]);
   });
 
+  it("finds the regular Shopify store on the www. address of a custom-built site", async () => {
+    mockSite({
+      "https://www.passenger.example/products.json?limit=1": { body: { products: [] } },
+      "https://www.passenger.example/products.json?limit=250&page=1": { body: fx.shopifyProducts },
+      "https://www.passenger.example/products.json?limit=250&page=2": { body: { products: [] } },
+    });
+    const feed = await detectFeed("https://passenger.example");
+    expect(feed.source).toEqual({ platform: "shopify", feedUrl: "https://www.passenger.example" });
+    expect(feed.products).toHaveLength(2);
+  });
+
+  it("falls back to the store's myshopify.com address named in the page", async () => {
+    mockSite({
+      "https://hydro.example/": { body: '<html><script>window.shop="hydro-store.myshopify.com"</script><img src="https://cdn.shopify.com/x.jpg"></html>' },
+      "https://hydro-store.myshopify.com/products.json?limit=1": { body: { products: [] } },
+      "https://hydro-store.myshopify.com/products.json?limit=250&page=1": { body: fx.shopifyProducts },
+      "https://hydro-store.myshopify.com/products.json?limit=250&page=2": { body: { products: [] } },
+    });
+    const feed = await detectFeed("hydro.example");
+    expect(feed.source).toEqual({ platform: "shopify", feedUrl: "https://hydro-store.myshopify.com" });
+  });
+
   it("detects Big Cartel's array-shaped products.json", async () => {
     mockSite({
       "https://tiny.example/products.json?limit=250": { body: fx.bigCartelProducts },
