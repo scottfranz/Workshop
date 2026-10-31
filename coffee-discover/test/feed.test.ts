@@ -35,6 +35,12 @@ describe("new-arrival logic", () => {
       .toEqual(["later", "labelled", "dated", "old"]);
   });
 
+  it("uses the store's date for a product first seen long after it was published", () => {
+    // A filter change let Monogram's April expo tasters in last night: they didn't just arrive.
+    const items = buildItems(roaster, [product("late", { publishedAt: new Date(NOW - 200 * DAY).toISOString() })], { late: NOW - DAY }, NOW - 2 * DAY, NOW);
+    expect(items[0]).toMatchObject({ arrivedAt: NOW - 200 * DAY, isNew: false, sinceLastVisit: false });
+  });
+
   it("stops calling things new after two weeks", () => {
     const items = buildItems(roaster, [product("x")], { x: NOW - 20 * DAY }, null, NOW);
     expect(items[0].isNew).toBe(false);

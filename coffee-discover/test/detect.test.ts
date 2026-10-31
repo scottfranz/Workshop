@@ -97,7 +97,23 @@ describe("detectFeed", () => {
         <url><loc>https://priv.example/products/ethiopia-guji-hambela</loc></url></urlset>` },
     });
     const feed = await detectFeed("priv.example");
-    // Colombia Decaf isn't in the sitemap, but its name says coffee, so it stays.
+    // Colombia Decaf isn't in the sitemap, but its name says coffee and it has a description, so it stays.
+    expect(feed.products.map((p) => p.title)).toEqual(["Ethiopia Guji Hambela", "Colombia Decaf"]);
+  });
+
+  it("hides unlisted products with no description, even with a coffee name (Monogram's expo tasters)", async () => {
+    const taster = { id: 7009, title: "Finca Deborah Enigma", handle: "finca-deborah-enigma", product_type: "", tags: ["gorgias_do_not_recommend"],
+      published_at: "2026-04-07T00:00:00Z", body_html: "", variants: [{ price: "34.57", available: true }], images: [] };
+    const products = { products: [...fx.shopifyProducts.products, taster] };
+    mockSite({
+      "https://priv.example/products.json?limit=250": { body: products },
+      "https://priv.example/products.json?limit=250&page=1": { body: products },
+      "https://priv.example/sitemap.xml": { type: "application/xml", body: `<sitemapindex>
+        <sitemap><loc>https://priv.example/sitemap_products_1.xml?from=1&amp;to=9</loc></sitemap></sitemapindex>` },
+      "https://priv.example/sitemap_products_1.xml?from=1&to=9": { type: "application/xml", body: `<urlset>
+        <url><loc>https://priv.example/products/ethiopia-guji-hambela</loc></url></urlset>` },
+    });
+    const feed = await detectFeed("priv.example");
     expect(feed.products.map((p) => p.title)).toEqual(["Ethiopia Guji Hambela", "Colombia Decaf"]);
   });
 

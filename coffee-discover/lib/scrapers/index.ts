@@ -86,7 +86,8 @@ export function dropWholesaleTwins(products: Product[]): Product[] {
   const groups = new Map<string, Product[]>();
   for (const p of products) {
     // Same name and same bag size: bigger bags are normally cheaper per gram, which isn't wholesale.
-    const key = `${p.title.toLowerCase().replace(/\s+/g, " ").trim()}|${p.size?.grams ?? ""}`;
+    // Same currency too: Father's serves some pages in CZK and others in EUR.
+    const key = `${p.title.toLowerCase().replace(/\s+/g, " ").trim()}|${p.size?.grams ?? ""}|${p.currency ?? ""}`;
     groups.set(key, [...(groups.get(key) ?? []), p]);
   }
   const drop = new Set<Product>();

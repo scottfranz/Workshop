@@ -88,7 +88,10 @@ export function parseShopify(
       noteSkipped(title);
       continue;
     }
-    if (listed && !listed.has(p.handle) && !titleSaysCoffee(title)) {
+    // Unlisted with no description at all: event, café or partner leftovers (Monogram's
+    // SCA expo tasters "Finca Deborah Enigma", Onyx's "Solace"). Real coffees a shop keeps
+    // out of its sitemap still have one (Onyx's Panama Elida, Regalia's Vinka lots).
+    if (listed && !listed.has(p.handle) && (!titleSaysCoffee(title) || !stripHtml(p.body_html).trim())) {
       noteSkipped(title);
       continue;
     }
