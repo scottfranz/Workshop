@@ -546,3 +546,23 @@ describe("private-label wholesale coffees", () => {
     expect(isPrivateLabel(["b2b-java-moon"], "Ethiopia Guji")).toBe(false);
   });
 });
+
+describe("gift subscriptions, classes and $0 listings", () => {
+  it("leaves out subscriptions named by their schedule", () => {
+    expect(looksLikeCoffee({ title: "Gift - 6 Months - Espresso - Every 2 Weeks", options: ["Grind Type", "Whole Bean"] })).toBe(false);
+    expect(looksLikeCoffee({ title: "Gift / Prepaid 12 months", options: ["Roast Style", "Espresso / Whole Bean"] })).toBe(false);
+    expect(looksLikeCoffee({ title: "Ethiopia Guji", options: ["Size", "250g"] })).toBe(true);
+  });
+  it("leaves out classes and events", () => {
+    expect(looksLikeCoffee({ title: "Coffee Cupping with Subtext", tags: ["classes and experience"] })).toBe(false);
+    expect(looksLikeCoffee({ title: "Coffee Brewing Basics", productType: "Workshop", options: ["Date", "Nov 4 2026"] })).toBe(false);
+    expect(looksLikeCoffee({ title: "Kenya Kiambu", tags: ["coffee", "single origin", "seasonal"] })).toBe(true);
+  });
+  it("leaves out products priced $0 everywhere", () => {
+    const data = { products: [
+      { id: 1, handle: "el-diviso", title: "Colombia El Diviso", product_type: "Coffee", tags: [], variants: [{ title: "10 OZ. / Whole Bean", price: "0.00", available: true }] },
+      { id: 2, handle: "el-puente", title: "Finca El Puente", product_type: "Coffee", tags: [], variants: [{ title: "12 oz", price: "25.00", available: true }] },
+    ] };
+    expect(parseShopify(data, "https://r.example").map((p) => p.title)).toEqual(["Finca El Puente"]);
+  });
+});

@@ -79,6 +79,11 @@ export function parseShopify(
     ].filter((o) => o && o !== "Title" && o !== "Default Title");
     const signals = { title, productType: p.product_type, tags, vendor: p.vendor, description: stripHtml(p.body_html), options };
     if (!keepCoffee(signals)) continue;
+    // $0.00 everywhere: not on sale yet, or priced by a bundle app we can't see.
+    if (variants.length && variants.every((v) => !(parseFloat(v.price ?? "") > 0))) {
+      noteSkipped(title);
+      continue;
+    }
     if (isPrivateLabel(tags, title)) {
       noteSkipped(title);
       continue;
