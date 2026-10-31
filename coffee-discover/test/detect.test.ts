@@ -97,8 +97,8 @@ describe("detectFeed", () => {
         <url><loc>https://priv.example/products/ethiopia-guji-hambela</loc></url></urlset>` },
     });
     const feed = await detectFeed("priv.example");
-    expect(feed.products.map((p) => p.title)).toEqual(["Ethiopia Guji Hambela"]);
-    expect(feed.skipped).toContain("Colombia Decaf");
+    // Colombia Decaf isn't in the sitemap, but its name says coffee, so it stays.
+    expect(feed.products.map((p) => p.title)).toEqual(["Ethiopia Guji Hambela", "Colombia Decaf"]);
   });
 
   it("detects Big Cartel's array-shaped products.json", async () => {

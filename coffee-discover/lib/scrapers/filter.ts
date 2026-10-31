@@ -115,6 +115,12 @@ function hasPhrase(haystack: string, phrase: string): boolean {
 
 const anyPhrase = (text: string, phrases: string[]) => phrases.some((p) => hasPhrase(text, p));
 
+/** The name alone says it's coffee: an origin, variety, process, "blend", "espresso"... */
+export function titleSaysCoffee(title: string): boolean {
+  const t = title.toLowerCase();
+  return anyPhrase(t, ORIGINS) || anyPhrase(t, COFFEE_WORDS) || hasPhrase(t, "coffee");
+}
+
 export function looksLikeCoffee(input: ProductSignals | string): boolean {
   const s: ProductSignals = typeof input === "string" ? { title: input } : input;
   const title = s.title.toLowerCase();
