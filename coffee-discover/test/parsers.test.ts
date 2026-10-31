@@ -566,3 +566,13 @@ describe("gift subscriptions, classes and $0 listings", () => {
     expect(parseShopify(data, "https://r.example").map((p) => p.title)).toEqual(["Finca El Puente"]);
   });
 });
+
+describe("dates from embedded page data", () => {
+  it("reads Father's product date when the schema.org markup has none", () => {
+    const ld = { "@context": "https://schema.org", "@type": "Product", name: "Kenya Karatina AB", category: "Coffee",
+      offers: { "@type": "Offer", price: "450", priceCurrency: "CZK", availability: "https://schema.org/InStock" } };
+    const props = { product: { createdAt: "2026-10-07T11:22:19.037Z", markedAsNewAt: "2026-10-08T14:43:00.000+02:00" }, relatedProducts: [{ createdAt: "2026-01-01T00:00:00Z" }] };
+    const html = `<script type="application/ld+json">${JSON.stringify(ld)}</script><script id="props" type="application/json">${JSON.stringify(props)}</script>`;
+    expect(productsFromHtml(html, "https://fathers.example/en/coffee/filter/kenya").products[0].publishedAt).toBe("2026-10-08T12:43:00.000Z");
+  });
+});

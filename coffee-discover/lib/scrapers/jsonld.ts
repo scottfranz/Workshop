@@ -131,6 +131,22 @@ function toProduct(c: Candidate): Product {
   return { ...product, searchText: searchTextFor(signalsOf(c)) };
 }
 
+/**
+ * The product's date from page data embedded alongside the schema.org markup:
+ * Father's puts its product record in <script id="props">, with markedAsNewAt
+ * (when it was announced as new) and createdAt.
+ */
+export function embeddedProductDate(html: string): string | null {
+  const m = html.match(/<script id="props" type="application\/json">([\s\S]*?)<\/script>/);
+  if (!m) return null;
+  try {
+    const p = (JSON.parse(m[1]) as { product?: Record<string, unknown> }).product;
+    return p ? toIso(p.markedAsNewAt ?? p.publishedAt ?? p.createdAt) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function productsFromHtml(html: string, pageUrl: string): { products: Product[]; listUrls: string[] } {
   const nodes = extractJsonLd(html);
   const products: Product[] = [];
@@ -155,7 +171,10 @@ export function productsFromHtml(html: string, pageUrl: string): { products: Pro
       }
     }
   }
-  return { products: dedupe(products), listUrls };
+  const found = dedupe(products);
+  // A product page without a date in its markup may have one in its page data.
+  if (found.length === 1 && !found[0].publishedAt) found[0] = { ...found[0], publishedAt: embeddedProductDate(html) };
+  return { products: found, listUrls };
 }
 
 // URL shapes used by common platforms for individual product pages.
