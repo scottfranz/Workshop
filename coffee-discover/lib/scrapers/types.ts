@@ -1,6 +1,6 @@
 import type { BagSize } from "./text";
 
-export type Platform = "shopify" | "storefront" | "woocommerce" | "squarespace" | "square" | "bigcartel" | "jsonld";
+export type Platform = "shopify" | "storefront" | "woocommerce" | "squarespace" | "square" | "subbly" | "bigcartel" | "jsonld";
 
 export const PLATFORM_LABELS: Record<Platform, string> = {
   shopify: "Shopify",
@@ -8,6 +8,7 @@ export const PLATFORM_LABELS: Record<Platform, string> = {
   woocommerce: "WooCommerce",
   squarespace: "Squarespace",
   square: "Square Online",
+  subbly: "Subbly",
   bigcartel: "Big Cartel",
   jsonld: "Web page",
 };
@@ -28,6 +29,10 @@ export interface Product {
   publishedAt: string | null;
   /** Short plain-text blurb, usually containing tasting notes. */
   description: string | null;
+  /** Brand the store files the product under (Shopify "vendor"); used server-side only. */
+  vendor?: string;
+  /** Which sales channel the store's own tags/category say this is for; used server-side only. */
+  channel?: "retail" | "wholesale";
   /** Extra text search matches against: fuller description, category, tags, sizes, origin/process/variety words. */
   searchText?: string;
 }

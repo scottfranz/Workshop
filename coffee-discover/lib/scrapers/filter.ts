@@ -46,7 +46,8 @@ const NON_COFFEE_TITLE = [
   // reading
   "book", "books", "atlas", "handbook", "magazine", "zine",
   // other drinks and food
-  "capsule", "capsules", "pods", "nespresso", "cometeer", "rtd", "ready to drink", "concentrate", "syrup", "tea", "chai",
+  "beer", "ipa", "bock", "lager", "mocktail", "mocktails", "kombucha", "soda", "oatside", "oat milk", "milk", "cans",
+  "local only", "pickup only", "pick-up only", "in-store only", "capsule", "capsules", "pods", "nespresso", "cometeer", "rtd", "ready to drink", "concentrate", "syrup", "tea", "chai",
   "matcha", "cocoa", "chocolate bar", "chocolate covered", "chocolate collection", "sipping chocolate", "drinking chocolate",
   "hot chocolate", "powder", "toddy", "instant", "sample only",
 ];
@@ -144,6 +145,9 @@ export function looksLikeCoffee(input: ProductSignals | string): boolean {
   // Tags marking café-only, partner or hidden products. ("wholesale" alone isn't enough:
   // many roasters tag retail coffees that way so they also appear in a wholesale portal.)
   if (/(^|\|\s*)(white[- ]label|cafe[- ]only|café[- ]only|utility[- ]sku|private|unlisted|hidden)(\s*\||$)/.test(tags)) return false;
+  // Explicitly wholesale-only. A plain "wholesale"/"b2b" tag usually means "also sold
+  // to wholesale customers" (Helm, Hex, Sweet Bloom retail bags carry it), so it isn't enough.
+  if (/wholesale[\s_-]*(only|exclusive)|b2b[\s_-]*only|trade[\s_-]*only/.test(tags)) return false;
   if (/wholesale/i.test(s.vendor ?? "")) return false;
   if (s.vendor && anyPhrase(s.vendor.toLowerCase(), GEAR_BRANDS)) return false;
 

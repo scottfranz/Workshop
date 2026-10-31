@@ -191,6 +191,20 @@ describe("detectFeed", () => {
     expect(feed.skipped).toContain("The April Filter Cup Kit");
   });
 
+  it("reads Subbly shops from their embedded product records", async () => {
+    mockSite({ "https://hatch.example/shop": { body: fx.subblyShopHtml } });
+    const feed = await detectFeed("https://hatch.example/shop");
+    expect(feed.source).toEqual({ platform: "subbly", feedUrl: "https://hatch.example/shop" });
+    const byTitle = Object.fromEntries(feed.products.map((p) => [p.title, p]));
+    // Size from the description text row; price from cents; CAD from "All Pricing in CAD".
+    expect(byTitle["Bahire Washed"]).toMatchObject({ price: 28, currency: "CAD", size: { grams: 300 }, available: true, url: "https://hatch.example/shop/bahire-washed" });
+    expect(byTitle["Bahire Washed"].description).toContain("Washed Bourbon");
+    expect(byTitle["Gamma"]).toMatchObject({ price: 22, size: { grams: 300, label: "300 g" } });
+    // Only the 2 kg is left: counts as sold out.
+    expect(byTitle["Rumudamo Washed"].available).toBe(false);
+    expect(byTitle["HIFLUX PURITY Filters"]).toBeUndefined();
+  });
+
   it("falls back to JSON-LD and crawls listed product pages", async () => {
     mockSite({
       "https://riverbend.example/shop": { body: fx.jsonLdListingHtml },

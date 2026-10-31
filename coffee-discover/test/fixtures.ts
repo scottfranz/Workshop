@@ -158,3 +158,16 @@ ${rsc({ products: [
 
 export const storefrontHomeHtml = `<!doctype html><html><head><title>april coffee roasters</title>
 <script>self.__next_f.push([1,"0:{}"])</script><img src="https://cdn.shopify.com/s/files/hero.jpg"></head><body><a href="/collections/everything">Shop</a></body></html>`;
+
+// Subbly storefront (Hatch Coffee): product records in the App Router stream, description as a text row.
+const subblyRecord = (id: number, slug: string, name: string, description: string, variants: [string, number, number | null][]) => ({
+  product: { id, slug, type: "one_time", name, description, giftCard: false, digital: false, images: [{ url: `https://cdn.filestackcontent.com/${slug}` }],
+    variants: variants.map(([n, price, stockCount]) => ({ name: n, price, stockCount })), createdAt: "2026-09-30T15:53:11.000000Z" },
+});
+const descriptionText = "<p>Washed Bourbon from Ngozi.<br><br>300g<br>Process: Washed</p>";
+export const subblyShopHtml = `<!doctype html><html lang="en"><head><title>Shop Coffee | Hatch Coffee</title>
+<link rel="icon" href="https://assets.subbly.co/icon.png"></head><body><span>All Pricing in CAD</span>
+<script>self.__next_f.push([1,${JSON.stringify(`5a:T${Buffer.byteLength(descriptionText).toString(16)},${descriptionText}3a:["$","div","p",${JSON.stringify(subblyRecord(1, "bahire-washed", "Bahire Washed", "$5a", [["Bahire Washed", 2800, 231]]))}]
+3b:["$","div","p",${JSON.stringify(subblyRecord(2, "gamma", "Gamma", "Bright and sweet.", [["300g", 2200, 1766], ["2kg", 12500, 461]]))}]
+3c:["$","div","p",${JSON.stringify(subblyRecord(3, "hiflux", "HIFLUX PURITY Filters", "Paper filters.", [["Flat Bottom Wave 155", 2000, 58]]))}]
+3d:["$","div","p",${JSON.stringify(subblyRecord(4, "sold", "Rumudamo Washed", "Natural process lot.", [["300g", 3400, 0], ["2kg", 15000, 5]]))}]`)}])</script></body></html>`;
