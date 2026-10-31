@@ -5,10 +5,10 @@
 
 import { keepCoffee, searchTextFor, type ProductSignals } from "./filter";
 import { FetchError, safeFetchText } from "./safeFetch";
-import { absoluteUrl, decodeEntities, minPrice, parseBagSize, stripHtml, summarize, toIso } from "./text";
+import { absoluteUrl, decodeEntities, minPrice, parseBagSize, pickBag, retailInStock, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
 
-const MAX_PRODUCT_PAGES = 24;
+const MAX_PRODUCT_PAGES = 40;
 const CONCURRENCY = 6;
 
 type Node = Record<string, unknown>;
@@ -62,6 +62,18 @@ function offersOf(node: Node): Node[] {
 
 type Candidate = Product & { category: string; signals: string[]; fullDescription: string };
 
+// schema.org QuantitativeValue unit codes (UN/CEFACT) for bag weights.
+const WEIGHT_UNITS: Record<string, string> = { GRM: "g", KGM: "kg", ONZ: "oz", LBR: "lb", G: "g", KG: "kg", OZ: "oz", LB: "lb" };
+
+function weightLabel(weight: unknown): string {
+  if (!weight || typeof weight !== "object") return typeof weight === "string" ? weight : "";
+  const w = weight as Node;
+  const unit = WEIGHT_UNITS[String(w.unitCode ?? w.unitText ?? "").toUpperCase()] ?? String(w.unitText ?? "");
+  return w.value !== undefined && unit ? `${w.value}${unit}` : "";
+}
+
+const weightSize = (weight: unknown) => parseBagSize(weightLabel(weight));
+
 export function productFromNode(node: Node, pageUrl: string): Candidate | null {
   if (!hasType(node, "Product") && !hasType(node, "ProductGroup")) return null;
   const title = decodeEntities(String(node.name ?? "")).trim();
@@ -69,15 +81,30 @@ export function productFromNode(node: Node, pageUrl: string): Candidate | null {
   const url = absoluteUrl((node.url as string) ?? (offersOf(node)[0]?.url as string) ?? pageUrl, pageUrl) ?? pageUrl;
   const offers = offersOf(node);
   const availability = offers.map((o) => String(o.availability ?? "")).filter(Boolean);
+  const inStock = (a: unknown) => a === undefined || a === null || a === "" || /InStock|PreOrder|LimitedAvailability|OnlineOnly/i.test(String(a));
+  // ProductGroup / hasVariant: one entry per bag size with its own weight, price and stock
+  // (Father's: 250 g / 1 kg / 2 kg). Price and size the bag a shopper would buy.
+  const sizes = (Array.isArray(node.hasVariant) ? (node.hasVariant as Node[]) : []).flatMap((v) => {
+    if (!v || typeof v !== "object") return [];
+    const vOffers = offersOf(v);
+    return [{
+      price: vOffers[0]?.price ?? vOffers[0]?.lowPrice,
+      available: vOffers.length === 0 || vOffers.some((o) => inStock(o.availability)),
+      label: [weightLabel(v.weight), String(v.name ?? "")].filter(Boolean).join(" "),
+    }];
+  });
+  const bag = sizes.length ? pickBag(sizes, title) : null;
   return {
     id: url,
     title,
     url,
     image: absoluteUrl(firstImage(node.image), pageUrl),
-    price: minPrice(offers.flatMap((o) => [o.price, o.lowPrice])),
-    size: parseBagSize(title) ?? (offers.length === 1 ? parseBagSize(String(offers[0].name ?? "")) : null),
+    price: bag?.price ?? minPrice(offers.flatMap((o) => [o.price, o.lowPrice])),
+    size: bag?.size ?? parseBagSize(title) ?? weightSize(node.weight) ?? (offers.length === 1 ? parseBagSize(String(offers[0].name ?? "")) : null),
     currency: (offers.find((o) => o.priceCurrency)?.priceCurrency as string) ?? null,
-    available: availability.length === 0 || availability.some((a) => /InStock|PreOrder|LimitedAvailability|OnlineOnly/i.test(a)),
+    available: sizes.length
+      ? retailInStock(sizes)
+      : availability.length === 0 || availability.some((a) => /InStock|PreOrder|LimitedAvailability|OnlineOnly/i.test(a)),
     publishedAt: toIso(node.releaseDate ?? node.datePublished),
     description: summarize(String(node.description ?? "")),
     category: String(node.category ?? ""),
@@ -133,6 +160,31 @@ export function productsFromHtml(html: string, pageUrl: string): { products: Pro
 
 // URL shapes used by common platforms for individual product pages.
 const PRODUCT_PATH = /\/(products?|shop\/p|store\/p|p|item|coffees?)\/[^/?#]+\/?$/i;
+// A shop or coffee section followed by more path: /en/coffee/espresso/ethiopia-chelbesa,
+// /kava/filtr/kenya. Category pages match too; they just yield no product data.
+const SECTION = /^(products?|shop|store|eshop|e-shop|coffees?|kava|káva|kaffee|kaffe|cafe|café|beans)$/i;
+
+function looksLikeProductPath(path: string): boolean {
+  if (PRODUCT_PATH.test(path)) return true;
+  const parts = path.split("/").filter(Boolean);
+  const i = parts.findIndex((p) => SECTION.test(decodeURIComponent(p)));
+  return i !== -1 && parts.length - i >= 2 && !/blog|news|journal|recipe|guide|subscription/i.test(path);
+}
+
+/** The shop or coffee listing a homepage links to (/en/coffee, /shop), for finding every product. */
+export function listingLinks(html: string, pageUrl: string): string[] {
+  const origin = new URL(pageUrl).origin;
+  const found = new Set<string>();
+  for (const m of html.matchAll(/<a\b[^>]*\shref=["']([^"'#?]+)["']/gi)) {
+    const abs = absoluteUrl(decodeEntities(m[1]), pageUrl);
+    if (!abs || new URL(abs).origin !== origin) continue;
+    const parts = new URL(abs).pathname.split("/").filter(Boolean);
+    const last = parts[parts.length - 1] ?? "";
+    // "/coffee", "/en/coffee", "/shop" (a language prefix allowed), not deeper.
+    if (parts.length <= 2 && SECTION.test(decodeURIComponent(last)) && (parts.length === 1 || /^[a-z]{2}$/.test(parts[0]))) found.add(abs.replace(/\/$/, ""));
+  }
+  return [...found].slice(0, 2);
+}
 
 export function productLinksFromHtml(html: string, pageUrl: string): string[] {
   const origin = new URL(pageUrl).origin;
@@ -141,7 +193,7 @@ export function productLinksFromHtml(html: string, pageUrl: string): string[] {
     const abs = absoluteUrl(decodeEntities(m[1]), pageUrl);
     if (!abs) continue;
     const u = new URL(abs);
-    if (u.origin !== origin || !PRODUCT_PATH.test(u.pathname)) continue;
+    if (u.origin !== origin || !looksLikeProductPath(u.pathname)) continue;
     u.search = "";
     links.add(u.toString());
   }
@@ -187,7 +239,16 @@ export async function fetchJsonLd(feedUrl: string, prefetchedHtml?: string): Pro
   const { products, listUrls } = productsFromHtml(html, feedUrl);
   if (products.length > 1) return { products, siteName };
 
-  const candidates = (listUrls.length ? listUrls : productLinksFromHtml(html, feedUrl)).slice(0, MAX_PRODUCT_PAGES);
+  let links = listUrls.length ? listUrls : productLinksFromHtml(html, feedUrl);
+  // A homepage usually features only some coffees; the shop/coffee listing has them all.
+  if (!listUrls.length) {
+    for (const listing of listingLinks(html, feedUrl).filter((u) => u !== feedUrl.replace(/\/$/, ""))) {
+      const page = await safeFetchText(listing, "text/html").catch(() => null);
+      if (page && page.status < 400) links = [...new Set([...links, ...productLinksFromHtml(page.body, listing)])];
+    }
+  }
+  // Deepest paths first: products sit below their category pages.
+  const candidates = links.sort((a, b) => b.split("/").length - a.split("/").length).slice(0, MAX_PRODUCT_PAGES);
   const pages = await mapLimited(candidates, CONCURRENCY, async (url) => {
     try {
       const res = await safeFetchText(url, "text/html");

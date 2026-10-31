@@ -115,6 +115,23 @@ export function dropWholesaleTwins(products: Product[]): Product[] {
   return products.filter((p) => !drop.has(p));
 }
 
+/**
+ * Filter and espresso roasts sold as separate products with the same name read
+ * like duplicates (Father's "Colombia – Chapata" at /coffee/espresso/… and
+ * /coffee/filter/…). Where names collide, add the roast from the product's address.
+ */
+export function labelRoastTwins(products: Product[]): Product[] {
+  const norm = (t: string) => t.toLowerCase().replace(/[\u2013\u2014-]/g, "-").replace(/\s+/g, " ").trim();
+  const count = new Map<string, number>();
+  for (const p of products) count.set(norm(p.title), (count.get(norm(p.title)) ?? 0) + 1);
+  return products.map((p) => {
+    if ((count.get(norm(p.title)) ?? 0) < 2) return p;
+    const path = (() => { try { return new URL(p.url).pathname.toLowerCase(); } catch { return ""; } })();
+    const roast = /(^|[/_-])espresso([/_-]|$)/.test(path) ? "Espresso" : /(^|[/_-])(filter|filtr|pour-?over)([/_-]|$)/.test(path) ? "Filter" : null;
+    return roast && !p.title.toLowerCase().includes(roast.toLowerCase()) ? { ...p, title: `${p.title} (${roast})` } : p;
+  });
+}
+
 const BULK_GRAMS = 900;
 
 /**
@@ -139,7 +156,7 @@ function finish(source: FeedSource, siteName: string | null, products: Product[]
   return {
     source,
     siteName,
-    products: dropBulkOnly(dropWholesaleTwins(dropWholesaleChannel(dropOtherMarketListings(products.filter(isRealPrice)))))
+    products: labelRoastTwins(dropBulkOnly(dropWholesaleTwins(dropWholesaleChannel(dropOtherMarketListings(products.filter(isRealPrice))))))
       // Big catalogues are mostly sold-out archives; make sure the cap keeps what's buyable.
       .sort((a, b) => Number(b.available) - Number(a.available))
       .slice(0, MAX_PRODUCTS)
