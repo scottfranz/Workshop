@@ -51,7 +51,10 @@ export function buildItems(
     const published = p.publishedAt ? Date.parse(p.publishedAt) : NaN;
     const arrivedAfterFollow = firstSeen > baseline;
     const recentlyPublished = Number.isFinite(published) && now - published < NEW_WINDOW_MS;
-    const arrivedAt = Number.isFinite(published) ? Math.max(published, arrivedAfterFollow ? firstSeen : 0) : firstSeen;
+    // Undated products already in the shop when it was followed (Wix, WooCommerce)
+    // didn't just arrive: sort them after dated ones, except those the shop labels new.
+    const arrivedAt = Number.isFinite(published) ? Math.max(published, arrivedAfterFollow ? firstSeen : 0)
+      : arrivedAfterFollow ? firstSeen : p.markedNew ? roaster.addedAt : 0;
     const isNew = recentlyPublished || (arrivedAfterFollow && now - firstSeen < NEW_WINDOW_MS);
     return {
       ...p,

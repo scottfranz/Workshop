@@ -17,6 +17,8 @@ interface WixProduct {
   currency?: string;
   isInStock?: boolean;
   productType?: string;
+  /** The shop's label on the product card ("New arrival", "Rare"). */
+  ribbon?: string;
   media?: { fullUrl?: string; url?: string }[];
   options?: { title?: string; selections?: { description?: string; value?: string }[] }[];
 }
@@ -92,6 +94,8 @@ export async function parseWix(
       currency: p.currency ?? null,
       available: p.isInStock !== false,
       publishedAt: null,
+      // Wix gives no dates, but shops set ribbons like "New arrival".
+      markedNew: /\bnew\b/i.test(p.ribbon ?? "") || undefined,
       description: summarize(description),
       searchText: searchTextFor(signals),
     });

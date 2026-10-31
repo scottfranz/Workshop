@@ -28,6 +28,8 @@ export interface Product {
   available: boolean;
   /** ISO timestamp when the store says the product was published, if known. */
   publishedAt: string | null;
+  /** The store labels it new ("New arrival"); a hint for stores that give no dates. */
+  markedNew?: boolean;
   /** Short plain-text blurb, usually containing tasting notes. */
   description: string | null;
   /** Brand the store files the product under (Shopify "vendor"); used server-side only. */
