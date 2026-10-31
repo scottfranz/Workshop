@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { parseBigCartel } from "@/lib/scrapers/bigcartel";
 import { looksLikeCoffee } from "@/lib/scrapers/filter";
 import { productLinksFromHtml, productsFromHtml, siteNameFromHtml } from "@/lib/scrapers/jsonld";
-import { isPrivateLabel, parseShopify, shopifyProductsEndpoint } from "@/lib/scrapers/shopify";
+import { isPrivateLabel, pageSummary, parseShopify, shopifyProductsEndpoint } from "@/lib/scrapers/shopify";
 import { isSquarespaceProductPage, parseSquarespace } from "@/lib/scrapers/squarespace";
 import { parseWooCommerce, wooCategoryFromUrl } from "@/lib/scrapers/woocommerce";
 import * as fx from "./fixtures";
@@ -580,5 +580,21 @@ describe("dates from embedded page data", () => {
     const props = { product: { createdAt: "2026-10-07T11:22:19.037Z", markedAsNewAt: "2026-10-08T14:43:00.000+02:00" }, relatedProducts: [{ createdAt: "2026-01-01T00:00:00Z" }] };
     const html = `<script type="application/ld+json">${JSON.stringify(ld)}</script><script id="props" type="application/json">${JSON.stringify(props)}</script>`;
     expect(productsFromHtml(html, "https://fathers.example/en/coffee/filter/kenya").products[0].publishedAt).toBe("2026-10-08T12:43:00.000Z");
+  });
+});
+
+describe("descriptions without shipping notes", () => {
+  it("leaves out ordering and shipping sentences (Subtext)", async () => {
+    const { summarize } = await import("@/lib/scrapers/text");
+    expect(summarize("<p>Order by Sunday at 11:59 pm EST for Wednesday shipment or by Tuesday 11:59 pm EST for Friday shipment.</p>")).toBeNull();
+    expect(summarize("<p>Ships within 2 business days. Juicy and bright, with notes of plum and cocoa.</p>")).toBe("plum and cocoa");
+    expect(summarize("<p>A washed Kenya from Kirinyaga. Dense and sweet.</p>")).toBe("A washed Kenya from Kirinyaga. Dense and sweet.");
+  });
+  it("reads a product page's own summary", async () => {
+    const { summarize } = await import("@/lib/scrapers/text");
+    const page = `<meta property="og:site_name" content="Subtext Coffee Roasters"><meta name="description" content="Filter roasted coffee beans from Karimikui factory in Kirinyaga, Kenya that is a washed field blend with tasting notes of green grape, cranberry &amp; orange zest.">`;
+    expect(pageSummary(page)).toBe("Filter roasted coffee beans from Karimikui factory in Kirinyaga, Kenya that is a washed field blend with tasting notes of green grape, cranberry & orange zest.");
+    expect(pageSummary(`<meta name="description" content="Order by Sunday for Wednesday shipment.">`)).toBeNull();
+    expect(summarize("a washed field blend with tasting notes of green grape, cranberry & orange zest.")).toBe("green grape, cranberry & orange zest");
   });
 });

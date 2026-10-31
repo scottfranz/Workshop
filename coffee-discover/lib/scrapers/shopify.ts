@@ -1,7 +1,7 @@
 import { keepCoffee, noteSkipped, searchTextFor, titleSaysCoffee } from "./filter";
 import { hydrogenShownSizes, isHydrogenHome } from "./hydrogen";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
-import { absoluteUrl, pickBag, retailInStock, stripHtml, summarize, toIso } from "./text";
+import { absoluteUrl, decodeEntities, pickBag, retailInStock, stripHtml, summarize, toIso, withoutLogistics } from "./text";
 import type { Product } from "./types";
 
 interface ShopifyProduct {
@@ -199,5 +199,44 @@ export async function fetchShopify(feedUrl: string, preferredCurrency?: string):
     const shown = await hydrogenShownSizes(homePage, inStock);
     if (shown) products = parseAll(shown);
   }
+  await describeFromPages(products);
   return { products, siteName: meta.name };
+}
+
+const MAX_PAGE_DESCRIPTIONS = 24;
+
+/**
+ * Some shops leave the product description to shipping notes and write about the
+ * coffee only in the page's search summary (Subtext: "...a washed field blend with
+ * tasting notes of green grape, cranberry & orange zest"). For in-stock coffees with
+ * no description, read that summary from the product page.
+ */
+async function describeFromPages(products: Product[]): Promise<void> {
+  const bare = products.filter((p) => p.available && !p.description).slice(0, MAX_PAGE_DESCRIPTIONS);
+  const found = new Map<Product, string>();
+  for (let i = 0; i < bare.length; i += 4) {
+    await Promise.all(bare.slice(i, i + 4).map(async (p) => {
+      const res = await safeFetchText(p.url, "text/html").catch(() => null);
+      const text = res && res.status < 400 ? pageSummary(res.body) : null;
+      if (text) found.set(p, text);
+    }));
+  }
+  // The same summary on several coffees is the shop's own blurb, not about the coffee.
+  const uses = new Map<string, number>();
+  for (const text of found.values()) uses.set(text, (uses.get(text) ?? 0) + 1);
+  for (const [p, text] of found) {
+    if (uses.get(text)! > 1) continue;
+    p.description = summarize(text);
+    p.searchText = [p.searchText, text.toLowerCase()].filter(Boolean).join(" ");
+  }
+}
+
+/** A page's own summary (meta description), unless it's the shop's generic one or shipping notes. */
+export function pageSummary(html: string): string | null {
+  const meta = (attr: string) => html.match(new RegExp(`<meta[^>]+${attr}[^>]+content="([^"]*)"`, "i"))?.[1]
+    ?? html.match(new RegExp(`<meta[^>]+content="([^"]*)"[^>]+${attr}`, "i"))?.[1];
+  const text = decodeEntities(meta('name="description"') ?? meta('property="og:description"') ?? "").trim();
+  const site = decodeEntities(meta('property="og:site_name"') ?? "").trim();
+  const clean = text && withoutLogistics(text);
+  return clean && clean.length >= 30 && clean !== site ? clean : null;
 }

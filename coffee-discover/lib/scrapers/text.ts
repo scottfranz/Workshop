@@ -27,11 +27,19 @@ export function stripHtml(html: string | null | undefined): string {
 }
 
 /** First ~maxLen chars of plain text, cut at a word boundary. */
+// Ordering and shipping notes ("Order by Sunday 11:59 pm EST for Wednesday shipment").
+const LOGISTICS = /\b(order(ed|s)? (by|before)|ship(s|ping|ment|ped)?|dispatch(es|ed)?|deliver(y|ies|ed)|cut-?off|business days?|pre-?orders?)\b/i;
+
+/** The text without sentences about ordering and shipping, which some shops put first. */
+export function withoutLogistics(text: string): string {
+  return text.split(/(?<=[.!?])\s+/).filter((s) => !LOGISTICS.test(s)).join(" ").trim();
+}
+
 export function summarize(html: string | null | undefined, maxLen = 180): string | null {
-  const text = stripHtml(html);
+  const text = withoutLogistics(stripHtml(html));
   if (!text) return null;
   // Prefer an explicit tasting-notes phrase if the roaster wrote one.
-  const notes = text.match(/(?:tasting notes?|notes of|we taste|cup notes?|flavou?r notes?)\s*[:\-–]?\s*([^.]{6,120})/i);
+  const notes = text.match(/(?:tasting notes?|notes of|we taste|cup notes?|flavou?r notes?)\s*(?:of\b)?\s*[:\-–]?\s*([^.]{6,120})/i);
   const base = notes ? notes[1].trim() : text;
   if (base.length <= maxLen) return base;
   const cut = base.slice(0, maxLen);
