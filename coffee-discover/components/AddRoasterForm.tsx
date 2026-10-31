@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { reportLink } from "@/lib/site";
+import { cleanPastedUrl } from "@/lib/url";
 
 export function AddRoasterForm({ onAdd, autoFocus, compact }: {
   onAdd: (url: string, name?: string) => Promise<void>;
@@ -16,10 +17,13 @@ export function AddRoasterForm({ onAdd, autoFocus, compact }: {
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!url.trim()) return;
+    // Show the address without the tracking codes it was copied with.
+    const clean = cleanPastedUrl(url);
+    setUrl(clean);
     setBusy(true);
     setError(null);
     try {
-      await onAdd(url.trim(), name.trim() || undefined);
+      await onAdd(clean, name.trim() || undefined);
       setUrl("");
       setName("");
     } catch (err) {
