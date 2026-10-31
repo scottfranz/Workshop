@@ -1,4 +1,5 @@
 import { keepCoffee, noteSkipped, searchTextFor, titleSaysCoffee } from "./filter";
+import { hydrogenShownSizes, isHydrogenHome } from "./hydrogen";
 import { FetchError, safeFetchJson, safeFetchText } from "./safeFetch";
 import { absoluteUrl, pickBag, retailInStock, stripHtml, summarize, toIso } from "./text";
 import type { Product } from "./types";
@@ -40,8 +41,12 @@ function channelOf(tags: string[], productType?: string): "retail" | "wholesale"
  *   missing while the sitemap catches up. So a product missing from it is only
  *   left out when its name gives no sign of being coffee ("Onyx Likes You",
  *   "IO-E-23"), not when it does ("Vinka Washed Sidra").
+ * @param shown sizes the store's own site offers, by handle (see hydrogen.ts).
  */
-export function parseShopify(data: unknown, feedUrl: string, currency: string | null = null, listed: Set<string> | null = null): Product[] {
+export function parseShopify(
+  data: unknown, feedUrl: string, currency: string | null = null, listed: Set<string> | null = null,
+  shown: Map<string, Set<string>> | null = null,
+): Product[] {
   const list = (data as { products?: ShopifyProduct[] })?.products;
   if (!Array.isArray(list)) return [];
   const origin = new URL(feedUrl).origin;
@@ -61,7 +66,9 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       noteSkipped(title);
       continue;
     }
-    const priced = variants.map((v) => ({ price: v.price, available: v.available, label: [v.title, v.option1, v.option2, v.option3].filter(Boolean).join(" ") }));
+    const offered = shown?.get(p.handle);
+    const sold = offered ? variants.filter((v) => offered.has(v.title ?? "")) : [];
+    const priced = (sold.length ? sold : variants).map((v) => ({ price: v.price, available: v.available, label: [v.title, v.option1, v.option2, v.option3].filter(Boolean).join(" ") }));
     const bag = pickBag(priced, title);
     products.push({
       id: String(p.id),
@@ -74,7 +81,7 @@ export function parseShopify(data: unknown, feedUrl: string, currency: string | 
       channel: channelOf(tags, p.product_type),
       currency,
       // "Archived" products linger in the feed with stray stock (Passenger's Bumba).
-      available: retailInStock(priced) && !tags.some((t) => /^archived?$/i.test(t.trim())),
+      available: retailInStock(priced) && !tags.some((t) => /^archived?$/i.test(t.trim())) && offered?.size !== 0,
       publishedAt: toIso(p.published_at ?? p.created_at),
       description: summarize(p.body_html),
       searchText: searchTextFor(signals),
@@ -134,7 +141,9 @@ export async function fetchShopify(feedUrl: string, preferredCurrency?: string):
   // Ask for the visitor's currency (the store's own price there, not a conversion)
   // or else the store's home currency, then label prices with whatever it actually uses.
   const currency = await shopifyPricingCurrency(feedUrl, preferredCurrency ?? meta.currency);
-  const products: Product[] = [];
+  // A Hydrogen site can hide sizes products.json lists; fetch its homepage alongside.
+  const home = safeFetchText(new URL(feedUrl).origin + "/", "text/html").catch(() => null);
+  const pages: unknown[] = [];
   for (let page = 1; page <= 6; page++) {
     const currencyParam = currency ? `&currency=${encodeURIComponent(currency)}` : "";
     const res = await safeFetchJson(`${endpoint}?limit=250&page=${page}${currencyParam}`);
@@ -146,7 +155,20 @@ export async function fetchShopify(feedUrl: string, preferredCurrency?: string):
     // Stop on an empty page, not a short one: Shopify sometimes returns 249 of 250
     // with more pages still to come (Onyx's retail blends were on page 2).
     if (raw.length === 0) break;
-    products.push(...parseShopify(res!.data, feedUrl, currency, listed));
+    pages.push(res!.data);
+  }
+  const parseAll = (shown: Map<string, Set<string>> | null = null) =>
+    pages.flatMap((data) => parseShopify(data, feedUrl, currency, listed, shown));
+  let products = parseAll();
+  let homePage = await home;
+  if (!homePage || homePage.status >= 500) homePage = await safeFetchText(new URL(feedUrl).origin + "/", "text/html").catch(() => null);
+  if (isHydrogenHome(homePage)) {
+    const sizeCount = new Map(pages.flatMap((d) => (d as { products: ShopifyProduct[] }).products)
+      .map((p) => [p.handle, p.variants?.length ?? 0] as const));
+    const inStock = products.map((p) => p.url.split("/products/")[1])
+      .filter((h, i) => products[i].available && (sizeCount.get(h) ?? 0) > 1);
+    const shown = await hydrogenShownSizes(homePage, inStock);
+    if (shown) products = parseAll(shown);
   }
   return { products, siteName: meta.name };
 }
